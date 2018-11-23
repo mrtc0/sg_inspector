@@ -116,16 +116,16 @@ func main() {
 		}
 		slack_token := os.Getenv("SLACK_TOKEN")
 		slack_channel := os.Getenv("SLACK_CHANNEL_NAME")
-		api := slack.New(slack_token)
-		params := slack.PostMessageParameters{
-			Username:  "アルパカ",
-			IconEmoji: ":alpaca:",
-		}
 
 		var cfg config.Config
 		_, err = toml.DecodeFile(c.String("config"), &cfg)
 		if err != nil {
 			return err
+		}
+		api := slack.New(slack_token)
+		params := slack.PostMessageParameters{
+			Username:  cfg.Username,
+			IconEmoji: cfg.IconEmoji,
 		}
 
 		osAuthUrl := os.Getenv("OS_AUTH_URL")

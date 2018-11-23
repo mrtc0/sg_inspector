@@ -1,7 +1,9 @@
 package config
 
 type Config struct {
-	Rules []Rule
+	Rules     []Rule
+	Username  string `toml:"username"`
+	IconEmoji string `toml:"icon_emoji"`
 }
 
 type Rule struct {
