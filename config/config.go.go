@@ -9,4 +9,3 @@ type Rule struct {
 	SG     string
 	Port   []string
 }
-

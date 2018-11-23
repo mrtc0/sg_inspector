@@ -20,6 +20,39 @@ import (
 
 var version string
 
+func Authenticate(opts gophercloud.AuthOptions, osCert string, osKey string) (*gophercloud.ProviderClient, error) {
+	client, err := openstack.NewClient(opts.IdentityEndpoint)
+	if err != nil {
+		return nil, err
+	}
+	tlsConfig := &tls.Config{}
+	if osCert != "" && osKey != "" {
+		clientCert, err := ioutil.ReadFile(osCert)
+		if err != nil {
+			return nil, err
+		}
+		clientKey, err := ioutil.ReadFile(osKey)
+		if err != nil {
+			return nil, err
+		}
+		cert, err := tls.X509KeyPair([]byte(clientCert), []byte(clientKey))
+		if err != nil {
+			return nil, err
+		}
+		tlsConfig.Certificates = []tls.Certificate{cert}
+		tlsConfig.BuildNameToCertificate()
+		transport := &http.Transport{Proxy: http.ProxyFromEnvironment, TLSClientConfig: tlsConfig}
+
+		client.HTTPClient.Transport = transport
+	}
+
+	err = openstack.Authenticate(client, opts)
+	if err != nil {
+		return nil, err
+	}
+	return client, nil
+}
+
 func main() {
 	app := cli.NewApp()
 	app.Flags = []cli.Flag{
@@ -49,32 +82,7 @@ func main() {
 			TenantName:       osTenantName,
 		}
 
-		client, err := openstack.NewClient(osAuthUrl)
-		if err != nil {
-			return err
-		}
-		tlsConfig := &tls.Config{}
-		if osCert != "" && osKey != "" {
-			clientCert, err := ioutil.ReadFile(osCert)
-			if err != nil {
-				return err
-			}
-			clientKey, err := ioutil.ReadFile(osKey)
-			if err != nil {
-				return err
-			}
-			cert, err := tls.X509KeyPair([]byte(clientCert), []byte(clientKey))
-			if err != nil {
-				return err
-			}
-			tlsConfig.Certificates = []tls.Certificate{cert}
-			tlsConfig.BuildNameToCertificate()
-			transport := &http.Transport{Proxy: http.ProxyFromEnvironment, TLSClientConfig: tlsConfig}
-
-			client.HTTPClient.Transport = transport
-		}
-
-		err = openstack.Authenticate(client, opts)
+		client, err := Authenticate(opts, osCert, osKey)
 		if err != nil {
 			return err
 		}
