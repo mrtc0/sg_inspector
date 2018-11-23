@@ -53,6 +53,27 @@ func Authenticate(opts gophercloud.AuthOptions, osCert string, osKey string) (*g
 	return client, nil
 }
 
+func fetchTenants(client *gophercloud.ProviderClient, eo gophercloud.EndpointOpts) ([]tenants.Tenant, error) {
+	ts := []tenants.Tenant{}
+	identityClient, err := openstack.NewIdentityV2(client, eo)
+	if err != nil {
+		return nil, err
+	}
+	tenants.List(identityClient, nil).EachPage(func(page pagination.Page) (bool, error) {
+		extracted, err := tenants.ExtractTenants(page)
+		if err != nil {
+			return false, err
+		}
+		for _, tenant := range extracted {
+			ts = append(ts, tenant)
+		}
+
+		return true, nil
+	})
+
+	return ts, nil
+}
+
 func main() {
 	app := cli.NewApp()
 	app.Flags = []cli.Flag{
@@ -87,23 +108,10 @@ func main() {
 			return err
 		}
 
-		identityClient, err := openstack.NewIdentityV2(client, gophercloud.EndpointOpts{
-			Region: osRegionName})
+		ts, err := fetchTenants(client, gophercloud.EndpointOpts{Region: osRegionName})
 		if err != nil {
 			return err
 		}
-		ts := []tenants.Tenant{}
-		tenants.List(identityClient, nil).EachPage(func(page pagination.Page) (bool, error) {
-			extracted, err := tenants.ExtractTenants(page)
-			if err != nil {
-				return false, err
-			}
-			for _, tenant := range extracted {
-				ts = append(ts, tenant)
-			}
-
-			return true, nil
-		})
 
 		networkClient, err := openstack.NewNetworkV2(client, gophercloud.EndpointOpts{
 			Region: osRegionName,
