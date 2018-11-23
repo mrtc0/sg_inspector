@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
+	"github.com/gophercloud/gophercloud/openstack/identity/v2/tenants"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/groups"
 	"github.com/gophercloud/gophercloud/pagination"
 	"github.com/urfave/cli"
@@ -66,10 +67,31 @@ func main() {
 		if err != nil {
 			return err
 		}
+
+		identityClient, err := openstack.NewIdentityV2(client, gophercloud.EndpointOpts{
+			Region: osRegionName})
+		if err != nil {
+			return err
+		}
+		ts := []tenants.Tenant{}
+		tenants.List(identityClient, nil).EachPage(func(page pagination.Page) (bool, error) {
+			extracted, err := tenants.ExtractTenants(page)
+			if err != nil {
+				return false, err
+			}
+			for _, tenant := range extracted {
+				ts = append(ts, tenant)
+			}
+
+			return true, nil
+		})
+
 		networkClient, err := openstack.NewNetworkV2(client, gophercloud.EndpointOpts{
 			Region: osRegionName,
 		})
-		log.Printf("[DEBUG] networkClient: %+v\n", networkClient)
+		if err != nil {
+			return err
+		}
 
 		groups.List(networkClient, groups.ListOpts{}).EachPage(func(page pagination.Page) (bool, error) {
 			securityGroups, err := groups.ExtractGroups(page)
@@ -77,7 +99,17 @@ func main() {
 				return false, err
 			}
 			for _, sg := range securityGroups {
-				log.Printf("[DEBUG] %s\n", sg.Name)
+				for _, rule := range sg.Rules {
+					if rule.RemoteIPPrefix == "0.0.0.0/0" {
+						var tenantName string
+						for _, t := range ts {
+							if t.ID == sg.TenantID {
+								tenantName = t.Name
+							}
+						}
+						log.Printf("[DEBUG] %s %s: %d-%d\n", tenantName, sg.Name, rule.PortRangeMin, rule.PortRangeMax)
+					}
+				}
 			}
 
 			return true, nil
