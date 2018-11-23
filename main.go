@@ -2,11 +2,13 @@ package main
 
 import (
 	"crypto/tls"
+	"fmt"
 	"github.com/BurntSushi/toml"
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
 	"github.com/gophercloud/gophercloud/openstack/identity/v2/tenants"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/groups"
+	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/rules"
 	"github.com/gophercloud/gophercloud/pagination"
 	"github.com/takaishi/noguard_sg_checker/config"
 	"github.com/urfave/cli"
@@ -135,6 +137,14 @@ func main() {
 			return err
 		}
 
+		for i, rule := range cfg.Rules {
+			for _, t := range ts {
+				if rule.Tenant == t.Name {
+					cfg.Rules[i].TenantID = t.ID
+				}
+			}
+		}
+
 		securityGroups, err := fetchSecurityGroups(client, gophercloud.EndpointOpts{Region: osRegionName})
 		if err != nil {
 			return err
@@ -142,28 +152,12 @@ func main() {
 		for _, sg := range securityGroups {
 			for _, rule := range sg.Rules {
 				if rule.RemoteIPPrefix == "0.0.0.0/0" && rule.Protocol == "tcp" {
-					var tenantName string
-					for _, t := range ts {
-						if t.ID == sg.TenantID {
-							tenantName = t.Name
+					if matchAllowdRule(cfg.Rules, sg, rule) {
+						tenantName, err := getTenantNameFromID(sg.TenantID, ts)
+						if err != nil {
+							return err
 						}
-					}
-					for _, allowdRule := range cfg.Rules {
-						if allowdRule.Tenant == tenantName && allowdRule.SG == sg.Name {
-							r := regexp.MustCompile(`(\d*)-(\d*)`)
-							for _, port := range allowdRule.Port {
-								if r.MatchString(port) {
-									result := r.FindAllStringSubmatch(port, -1)
-									if result[0][1] == strconv.Itoa(rule.PortRangeMin) && result[0][2] == strconv.Itoa(rule.PortRangeMax) {
-										log.Printf("[DEBUG] %s %s: %d-%d\n", tenantName, sg.Name, rule.PortRangeMin, rule.PortRangeMax)
-									}
-								}
-							}
-							if contains(allowdRule.Port, strconv.Itoa(rule.PortRangeMin)) {
-								log.Printf("[DEBUG] %s %s: %d-%d\n", tenantName, sg.Name, rule.PortRangeMin, rule.PortRangeMax)
-							} else {
-							}
-						}
+						log.Printf("[DEBUG] %s %s: %d-%d\n", tenantName, sg.Name, rule.PortRangeMin, rule.PortRangeMax)
 					}
 				}
 			}
@@ -175,6 +169,35 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+}
+
+func getTenantNameFromID(id string, ts []tenants.Tenant) (string, error) {
+	for _, t := range ts {
+		if t.ID == id {
+			return t.Name, nil
+		}
+	}
+	return "", fmt.Errorf("Not found tenant: %s", id)
+}
+
+func matchAllowdRule(allowdRules []config.Rule, sg groups.SecGroup, rule rules.SecGroupRule) bool {
+	for _, allowdRule := range allowdRules {
+		if allowdRule.TenantID == rule.TenantID && allowdRule.SG == sg.Name {
+			r := regexp.MustCompile(`(\d*)-(\d*)`)
+			for _, port := range allowdRule.Port {
+				if r.MatchString(port) {
+					result := r.FindAllStringSubmatch(port, -1)
+					if result[0][1] == strconv.Itoa(rule.PortRangeMin) && result[0][2] == strconv.Itoa(rule.PortRangeMax) {
+						return true
+					}
+				}
+			}
+			if contains(allowdRule.Port, strconv.Itoa(rule.PortRangeMin)) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func contains(slice []string, item string) bool {

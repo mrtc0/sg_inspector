@@ -5,7 +5,8 @@ type Config struct {
 }
 
 type Rule struct {
-	Tenant string
-	SG     string
-	Port   []string
+	Tenant   string
+	TenantID string
+	SG       string
+	Port     []string
 }
