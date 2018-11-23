@@ -10,6 +10,7 @@ import (
 	"github.com/gophercloud/gophercloud/pagination"
 	"github.com/takaishi/noguard_sg_checker/config"
 	"github.com/urfave/cli"
+	"regexp"
 	"strconv"
 
 	"io/ioutil"
@@ -148,11 +149,20 @@ func main() {
 						}
 					}
 					for _, allowdRule := range cfg.Rules {
-						if allowdRule.Tenant == tenantName && allowdRule.SG == sg.Name && contains(allowdRule.Port, strconv.Itoa(rule.PortRangeMin)) {
-							log.Printf("[DEBUG] %s %s: %d-%d\n", tenantName, sg.Name, rule.PortRangeMin, rule.PortRangeMax)
-
-						} else {
-
+						if allowdRule.Tenant == tenantName && allowdRule.SG == sg.Name {
+							r := regexp.MustCompile(`(\d*)-(\d*)`)
+							for _, port := range allowdRule.Port {
+								if r.MatchString(port) {
+									result := r.FindAllStringSubmatch(port, -1)
+									if result[0][1] == strconv.Itoa(rule.PortRangeMin) && result[0][2] == strconv.Itoa(rule.PortRangeMax) {
+										log.Printf("[DEBUG] %s %s: %d-%d\n", tenantName, sg.Name, rule.PortRangeMin, rule.PortRangeMax)
+									}
+								}
+							}
+							if contains(allowdRule.Port, strconv.Itoa(rule.PortRangeMin)) {
+								log.Printf("[DEBUG] %s %s: %d-%d\n", tenantName, sg.Name, rule.PortRangeMin, rule.PortRangeMax)
+							} else {
+							}
 						}
 					}
 				}
