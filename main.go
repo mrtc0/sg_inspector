@@ -169,7 +169,7 @@ func main() {
 		for _, sg := range securityGroups {
 			for _, rule := range sg.Rules {
 				if rule.RemoteIPPrefix == "0.0.0.0/0" && rule.Protocol == "tcp" {
-					if matchAllowdRule(cfg.Rules, sg, rule) {
+					if !matchAllowdRule(cfg.Rules, sg, rule) {
 						projectName, err := getProjectNameFromID(sg.TenantID, ps)
 						if err != nil {
 							return err
@@ -181,12 +181,19 @@ func main() {
 							Color: "#ff6347",
 						}
 						params.Attachments = append(params.Attachments, attachment)
+						if len(params.Attachments) == 20 {
+							err := postMessage(api, slack_channel, params)
+							if err != nil {
+								return err
+							}
+							params.Attachments = []slack.Attachment{}
+						}
 					}
 				}
 			}
 		}
 
-		_, _, err = api.PostMessage(slack_channel, "全解放しているセキュリティグループがあるように見えるぞ！大丈夫？？？", params)
+		err = postMessage(api, slack_channel, params)
 		if err != nil {
 			return err
 		}
@@ -197,6 +204,14 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+}
+
+func postMessage(api *slack.Client, channel string, params slack.PostMessageParameters) error {
+	_, _, err := api.PostMessage(channel, "全解放しているセキュリティグループがあるように見えるぞ！大丈夫？？？", params)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func getProjectNameFromID(id string, ps []projects.Project) (string, error) {
