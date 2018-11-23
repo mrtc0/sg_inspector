@@ -10,6 +10,8 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/groups"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/rules"
 	"github.com/gophercloud/gophercloud/pagination"
+	"github.com/joho/godotenv"
+	"github.com/nlopes/slack"
 	"github.com/takaishi/noguard_sg_checker/config"
 	"github.com/urfave/cli"
 	"regexp"
@@ -108,8 +110,23 @@ func main() {
 	}
 
 	app.Action = func(c *cli.Context) error {
+		err := godotenv.Load()
+		if err != nil {
+			log.Fatal("Error loading .env file")
+		}
+		slack_token := os.Getenv("SLACK_TOKEN")
+		slack_channel := os.Getenv("SLACK_CHANNEL_NAME")
+		api := slack.New(slack_token)
+		params := slack.PostMessageParameters{
+			Username:  "アルパカ",
+			IconEmoji: ":alpaca:",
+		}
+
 		var cfg config.Config
-		_, err := toml.DecodeFile(c.String("config"), &cfg)
+		_, err = toml.DecodeFile(c.String("config"), &cfg)
+		if err != nil {
+			return err
+		}
 
 		osAuthUrl := os.Getenv("OS_AUTH_URL")
 		osUsername := os.Getenv("OS_USERNAME")
@@ -158,9 +175,20 @@ func main() {
 							return err
 						}
 						log.Printf("[DEBUG] %s %s: %d-%d\n", tenantName, sg.Name, rule.PortRangeMin, rule.PortRangeMax)
+						attachment := slack.Attachment{
+							Title: fmt.Sprintf("テナント: %s", tenantName),
+							Text:  fmt.Sprintf("SecurityGroup: %s\nPortRange: %d-%d", sg.Name, rule.PortRangeMin, rule.PortRangeMax),
+							Color: "#ff6347",
+						}
+						params.Attachments = append(params.Attachments, attachment)
 					}
 				}
 			}
+		}
+
+		_, _, err = api.PostMessage(slack_channel, "全解放しているセキュリティグループがあるように見えるぞ！大丈夫？？？", params)
+		if err != nil {
+			return err
 		}
 
 		return nil
