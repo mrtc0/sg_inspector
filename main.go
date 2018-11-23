@@ -8,6 +8,7 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/identity/v2/tenants"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/groups"
 	"github.com/gophercloud/gophercloud/pagination"
+	"github.com/takaishi/noguard_sg_checker/config"
 	"github.com/urfave/cli"
 	"strconv"
 
@@ -19,16 +20,6 @@ import (
 
 var version string
 
-type Config struct {
-	Rules []Rule
-}
-
-type Rule struct {
-	Tenant string
-	SG     string
-	Port   []string
-}
-
 func main() {
 	app := cli.NewApp()
 	app.Flags = []cli.Flag{
@@ -39,7 +30,7 @@ func main() {
 	}
 
 	app.Action = func(c *cli.Context) error {
-		var cfg Config
+		var cfg config.Config
 		_, err := toml.DecodeFile(c.String("config"), &cfg)
 
 		osAuthUrl := os.Getenv("OS_AUTH_URL")
