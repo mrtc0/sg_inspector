@@ -14,8 +14,10 @@ import (
 	"github.com/nlopes/slack"
 	"github.com/takaishi/noguard_sg_checker/config"
 	"github.com/urfave/cli"
+	"path/filepath"
 	"regexp"
 	"strconv"
+	"strings"
 
 	"io/ioutil"
 	"log"
@@ -100,6 +102,26 @@ func fetchSecurityGroups(client *gophercloud.ProviderClient, eo gophercloud.Endp
 	return sgs, nil
 }
 
+func includeConfigFile(cfg *config.Config, include string) error {
+
+	files, err := filepath.Glob(include)
+	if err != nil {
+		return err
+	}
+
+	for _, file := range files {
+		tmpCfg := config.Config{}
+		_, err = toml.DecodeFile(file, &tmpCfg)
+		if err != nil {
+			return err
+		}
+		for _, r := range tmpCfg.Rules {
+			cfg.Rules = append(cfg.Rules, r)
+		}
+	}
+	return nil
+}
+
 func main() {
 	app := cli.NewApp()
 	app.Flags = []cli.Flag{
@@ -122,6 +144,12 @@ func main() {
 		if err != nil {
 			return err
 		}
+		if cfg.Include != "" {
+			if err := includeConfigFile(&cfg, cfg.Include); err != nil {
+				return err
+			}
+		}
+
 		api := slack.New(slack_token)
 		params := slack.PostMessageParameters{
 			Username:  cfg.Username,
@@ -169,12 +197,21 @@ func main() {
 		for _, sg := range securityGroups {
 			for _, rule := range sg.Rules {
 				if rule.RemoteIPPrefix == "0.0.0.0/0" && rule.Protocol == "tcp" {
+					ports := []string{}
 					if !matchAllowdRule(cfg.Rules, sg, rule) {
 						projectName, err := getProjectNameFromID(sg.TenantID, ps)
 						if err != nil {
 							return err
 						}
-						log.Printf("[DEBUG] %s %s: %d-%d\n", projectName, sg.Name, rule.PortRangeMin, rule.PortRangeMax)
+						fmt.Printf("[[rules]]\n")
+						fmt.Printf("tenant = \"%s\"\n", projectName)
+						fmt.Printf("sg = \"%s\"\n", sg.Name)
+						if rule.PortRangeMin == rule.PortRangeMax {
+							ports = append(ports, fmt.Sprintf("\"%d\"", rule.PortRangeMin))
+						} else {
+							ports = append(ports, fmt.Sprintf("\"%d-%d\"", rule.PortRangeMin, rule.PortRangeMax))
+						}
+
 						attachment := slack.Attachment{
 							Title: fmt.Sprintf("テナント: %s", projectName),
 							Text:  fmt.Sprintf("SecurityGroup: %s\nPortRange: %d-%d", sg.Name, rule.PortRangeMin, rule.PortRangeMax),
@@ -188,6 +225,9 @@ func main() {
 							}
 							params.Attachments = []slack.Attachment{}
 						}
+					}
+					if len(ports) > 0 {
+						fmt.Printf("port = [%s]\n\n", strings.Join(ports, ", "))
 					}
 				}
 			}
@@ -235,7 +275,7 @@ func matchAllowdRule(allowdRules []config.Rule, sg groups.SecGroup, rule rules.S
 					}
 				}
 			}
-			if contains(allowdRule.Port, strconv.Itoa(rule.PortRangeMin)) {
+			if contains(allowdRule.Port, strconv.Itoa(rule.PortRangeMin)) && contains(allowdRule.Port, strconv.Itoa(rule.PortRangeMax)) {
 				return true
 			}
 		}
