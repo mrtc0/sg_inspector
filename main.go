@@ -2,12 +2,15 @@ package main
 
 import (
 	"crypto/tls"
+	"github.com/BurntSushi/toml"
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
 	"github.com/gophercloud/gophercloud/openstack/identity/v2/tenants"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/groups"
 	"github.com/gophercloud/gophercloud/pagination"
 	"github.com/urfave/cli"
+	"strconv"
+
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -16,11 +19,28 @@ import (
 
 var version string
 
+type Config struct {
+	Rules []Rule
+}
+
+type Rule struct {
+	Tenant string
+	SG     string
+	Port   []string
+}
+
 func main() {
 	app := cli.NewApp()
+	app.Flags = []cli.Flag{
+		cli.StringFlag{
+			Name:  "config, c",
+			Value: "config.yaml",
+		},
+	}
 
 	app.Action = func(c *cli.Context) error {
-		log.Printf("[DEBUG] Hello World\n")
+		var cfg Config
+		_, err := toml.DecodeFile(c.String("config"), &cfg)
 
 		osAuthUrl := os.Getenv("OS_AUTH_URL")
 		osUsername := os.Getenv("OS_USERNAME")
@@ -107,7 +127,14 @@ func main() {
 								tenantName = t.Name
 							}
 						}
-						log.Printf("[DEBUG] %s %s: %d-%d\n", tenantName, sg.Name, rule.PortRangeMin, rule.PortRangeMax)
+						for _, allowdRule := range cfg.Rules {
+							if allowdRule.Tenant == tenantName && allowdRule.SG == sg.Name && contains(allowdRule.Port, strconv.Itoa(rule.PortRangeMin)) {
+								log.Printf("[DEBUG] %s %s: %d-%d\n", tenantName, sg.Name, rule.PortRangeMin, rule.PortRangeMax)
+
+							} else {
+
+							}
+						}
 					}
 				}
 			}
@@ -121,4 +148,13 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+}
+
+func contains(slice []string, item string) bool {
+	for _, a := range slice {
+		if a == item {
+			return true
+		}
+	}
+	return false
 }
