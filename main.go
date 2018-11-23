@@ -74,6 +74,27 @@ func fetchTenants(client *gophercloud.ProviderClient, eo gophercloud.EndpointOpt
 	return ts, nil
 }
 
+func fetchSecurityGroups(client *gophercloud.ProviderClient, eo gophercloud.EndpointOpts) ([]groups.SecGroup, error) {
+	sgs := []groups.SecGroup{}
+
+	networkClient, err := openstack.NewNetworkV2(client, eo)
+	if err != nil {
+		return nil, err
+	}
+
+	groups.List(networkClient, groups.ListOpts{}).EachPage(func(page pagination.Page) (bool, error) {
+		securityGroups, err := groups.ExtractGroups(page)
+		if err != nil {
+			return false, err
+		}
+		for _, sg := range securityGroups {
+			sgs = append(sgs, sg)
+		}
+		return true, nil
+	})
+	return sgs, nil
+}
+
 func main() {
 	app := cli.NewApp()
 	app.Flags = []cli.Flag{
@@ -113,41 +134,30 @@ func main() {
 			return err
 		}
 
-		networkClient, err := openstack.NewNetworkV2(client, gophercloud.EndpointOpts{
-			Region: osRegionName,
-		})
+		securityGroups, err := fetchSecurityGroups(client, gophercloud.EndpointOpts{Region: osRegionName})
 		if err != nil {
 			return err
 		}
-
-		groups.List(networkClient, groups.ListOpts{}).EachPage(func(page pagination.Page) (bool, error) {
-			securityGroups, err := groups.ExtractGroups(page)
-			if err != nil {
-				return false, err
-			}
-			for _, sg := range securityGroups {
-				for _, rule := range sg.Rules {
-					if rule.RemoteIPPrefix == "0.0.0.0/0" && rule.Protocol == "tcp" {
-						var tenantName string
-						for _, t := range ts {
-							if t.ID == sg.TenantID {
-								tenantName = t.Name
-							}
+		for _, sg := range securityGroups {
+			for _, rule := range sg.Rules {
+				if rule.RemoteIPPrefix == "0.0.0.0/0" && rule.Protocol == "tcp" {
+					var tenantName string
+					for _, t := range ts {
+						if t.ID == sg.TenantID {
+							tenantName = t.Name
 						}
-						for _, allowdRule := range cfg.Rules {
-							if allowdRule.Tenant == tenantName && allowdRule.SG == sg.Name && contains(allowdRule.Port, strconv.Itoa(rule.PortRangeMin)) {
-								log.Printf("[DEBUG] %s %s: %d-%d\n", tenantName, sg.Name, rule.PortRangeMin, rule.PortRangeMax)
+					}
+					for _, allowdRule := range cfg.Rules {
+						if allowdRule.Tenant == tenantName && allowdRule.SG == sg.Name && contains(allowdRule.Port, strconv.Itoa(rule.PortRangeMin)) {
+							log.Printf("[DEBUG] %s %s: %d-%d\n", tenantName, sg.Name, rule.PortRangeMin, rule.PortRangeMax)
 
-							} else {
+						} else {
 
-							}
 						}
 					}
 				}
 			}
-
-			return true, nil
-		})
+		}
 
 		return nil
 	}
