@@ -100,7 +100,7 @@ func main() {
 			}
 			for _, sg := range securityGroups {
 				for _, rule := range sg.Rules {
-					if rule.RemoteIPPrefix == "0.0.0.0/0" {
+					if rule.RemoteIPPrefix == "0.0.0.0/0" && rule.Protocol == "tcp" {
 						var tenantName string
 						for _, t := range ts {
 							if t.ID == sg.TenantID {
