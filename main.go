@@ -6,7 +6,7 @@ import (
 	"github.com/BurntSushi/toml"
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
-	"github.com/gophercloud/gophercloud/openstack/identity/v2/tenants"
+	"github.com/gophercloud/gophercloud/openstack/identity/v3/projects"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/groups"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/rules"
 	"github.com/gophercloud/gophercloud/pagination"
@@ -58,25 +58,25 @@ func Authenticate(opts gophercloud.AuthOptions, osCert string, osKey string) (*g
 	return client, nil
 }
 
-func fetchTenants(client *gophercloud.ProviderClient, eo gophercloud.EndpointOpts) ([]tenants.Tenant, error) {
-	ts := []tenants.Tenant{}
-	identityClient, err := openstack.NewIdentityV2(client, eo)
+func fetchProjects(client *gophercloud.ProviderClient, eo gophercloud.EndpointOpts) ([]projects.Project, error) {
+	ps := []projects.Project{}
+	identityClient, err := openstack.NewIdentityV3(client, eo)
 	if err != nil {
 		return nil, err
 	}
-	tenants.List(identityClient, nil).EachPage(func(page pagination.Page) (bool, error) {
-		extracted, err := tenants.ExtractTenants(page)
+	projects.List(identityClient, nil).EachPage(func(page pagination.Page) (bool, error) {
+		extracted, err := projects.ExtractProjects(page)
 		if err != nil {
 			return false, err
 		}
-		for _, tenant := range extracted {
-			ts = append(ts, tenant)
+		for _, project := range extracted {
+			ps = append(ps, project)
 		}
 
 		return true, nil
 	})
 
-	return ts, nil
+	return ps, nil
 }
 
 func fetchSecurityGroups(client *gophercloud.ProviderClient, eo gophercloud.EndpointOpts) ([]groups.SecGroup, error) {
@@ -132,7 +132,7 @@ func main() {
 		osUsername := os.Getenv("OS_USERNAME")
 		osPassword := os.Getenv("OS_PASSWORD")
 		osRegionName := os.Getenv("OS_REGION_NAME")
-		osTenantName := os.Getenv("OS_TENANT_NAME")
+		osProjectName := os.Getenv("OS_PROJECT_NAME")
 		osCert := os.Getenv("OS_CERT")
 		osKey := os.Getenv("OS_KEY")
 
@@ -141,7 +141,7 @@ func main() {
 			Username:         osUsername,
 			Password:         osPassword,
 			DomainName:       "Default",
-			TenantName:       osTenantName,
+			TenantName:       osProjectName,
 		}
 
 		client, err := Authenticate(opts, osCert, osKey)
@@ -149,15 +149,15 @@ func main() {
 			return err
 		}
 
-		ts, err := fetchTenants(client, gophercloud.EndpointOpts{Region: osRegionName})
+		ps, err := fetchProjects(client, gophercloud.EndpointOpts{Region: osRegionName})
 		if err != nil {
 			return err
 		}
 
 		for i, rule := range cfg.Rules {
-			for _, t := range ts {
-				if rule.Tenant == t.Name {
-					cfg.Rules[i].TenantID = t.ID
+			for _, p := range ps {
+				if rule.Tenant == p.Name {
+					cfg.Rules[i].TenantID = p.ID
 				}
 			}
 		}
@@ -170,13 +170,13 @@ func main() {
 			for _, rule := range sg.Rules {
 				if rule.RemoteIPPrefix == "0.0.0.0/0" && rule.Protocol == "tcp" {
 					if matchAllowdRule(cfg.Rules, sg, rule) {
-						tenantName, err := getTenantNameFromID(sg.TenantID, ts)
+						projectName, err := getProjectNameFromID(sg.TenantID, ps)
 						if err != nil {
 							return err
 						}
-						log.Printf("[DEBUG] %s %s: %d-%d\n", tenantName, sg.Name, rule.PortRangeMin, rule.PortRangeMax)
+						log.Printf("[DEBUG] %s %s: %d-%d\n", projectName, sg.Name, rule.PortRangeMin, rule.PortRangeMax)
 						attachment := slack.Attachment{
-							Title: fmt.Sprintf("テナント: %s", tenantName),
+							Title: fmt.Sprintf("テナント: %s", projectName),
 							Text:  fmt.Sprintf("SecurityGroup: %s\nPortRange: %d-%d", sg.Name, rule.PortRangeMin, rule.PortRangeMax),
 							Color: "#ff6347",
 						}
@@ -199,13 +199,13 @@ func main() {
 	}
 }
 
-func getTenantNameFromID(id string, ts []tenants.Tenant) (string, error) {
-	for _, t := range ts {
-		if t.ID == id {
-			return t.Name, nil
+func getProjectNameFromID(id string, ps []projects.Project) (string, error) {
+	for _, p := range ps {
+		if p.ID == id {
+			return p.Name, nil
 		}
 	}
-	return "", fmt.Errorf("Not found tenant: %s", id)
+	return "", fmt.Errorf("Not found project: %s", id)
 }
 
 func matchAllowdRule(allowdRules []config.Rule, sg groups.SecGroup, rule rules.SecGroupRule) bool {
