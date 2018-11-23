@@ -10,7 +10,6 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/groups"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/rules"
 	"github.com/gophercloud/gophercloud/pagination"
-	"github.com/joho/godotenv"
 	"github.com/nlopes/slack"
 	"github.com/takaishi/noguard_sg_checker/config"
 	"github.com/urfave/cli"
@@ -132,15 +131,12 @@ func main() {
 	}
 
 	app.Action = func(c *cli.Context) error {
-		err := godotenv.Load()
-		if err != nil {
-			log.Fatal("Error loading .env file")
-		}
+		log.SetFlags(log.Lshortfile)
 		slack_token := os.Getenv("SLACK_TOKEN")
 		slack_channel := os.Getenv("SLACK_CHANNEL_NAME")
 
 		var cfg config.Config
-		_, err = toml.DecodeFile(c.String("config"), &cfg)
+		_, err := toml.DecodeFile(c.String("config"), &cfg)
 		if err != nil {
 			return err
 		}
