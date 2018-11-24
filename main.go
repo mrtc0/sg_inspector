@@ -75,13 +75,14 @@ func action(c *cli.Context) error {
 		DomainName:       "Default",
 		TenantName:       osProjectName,
 	}
+	eo := gophercloud.EndpointOpts{Region: osRegionName}
 
 	client, err := openstack.Authenticate(opts, osCert, osKey)
 	if err != nil {
 		return err
 	}
 
-	ps, err := openstack.FetchProjects(client, gophercloud.EndpointOpts{Region: osRegionName})
+	ps, err := openstack.FetchProjects(client, eo)
 	if err != nil {
 		return err
 	}
@@ -94,7 +95,7 @@ func action(c *cli.Context) error {
 		}
 	}
 
-	securityGroups, err := openstack.FetchSecurityGroups(client, gophercloud.EndpointOpts{Region: osRegionName})
+	securityGroups, err := openstack.FetchSecurityGroups(client, eo)
 	if err != nil {
 		return err
 	}
