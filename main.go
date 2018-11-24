@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"github.com/BurntSushi/toml"
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/projects"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/groups"
@@ -11,7 +10,6 @@ import (
 	"github.com/takaishi/noguard_sg_checker/config"
 	"github.com/takaishi/noguard_sg_checker/openstack"
 	"github.com/urfave/cli"
-	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -21,40 +19,6 @@ import (
 )
 
 var version string
-
-func includeConfigFile(cfg *config.Config, include string) error {
-
-	files, err := filepath.Glob(include)
-	if err != nil {
-		return err
-	}
-
-	for _, file := range files {
-		tmpCfg := config.Config{}
-		_, err = toml.DecodeFile(file, &tmpCfg)
-		if err != nil {
-			return err
-		}
-		for _, r := range tmpCfg.Rules {
-			cfg.Rules = append(cfg.Rules, r)
-		}
-	}
-	return nil
-}
-
-func readConfigFile(cfgPath string) (config.Config, error) {
-	var cfg config.Config
-	_, err := toml.DecodeFile(cfgPath, &cfg)
-	if err != nil {
-		return cfg, err
-	}
-	if cfg.Include != "" {
-		if err := includeConfigFile(&cfg, cfg.Include); err != nil {
-			return cfg, err
-		}
-	}
-	return cfg, err
-}
 
 func main() {
 	app := cli.NewApp()
@@ -85,7 +49,7 @@ func action(c *cli.Context) error {
 	slack_token := os.Getenv("SLACK_TOKEN")
 	slack_channel := os.Getenv("SLACK_CHANNEL_NAME")
 
-	cfg, err := readConfigFile(c.String("config"))
+	cfg, err := config.ReadConfigFile(c.String("config"))
 	if err != nil {
 		return err
 	}
