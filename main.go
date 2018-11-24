@@ -57,121 +57,125 @@ func main() {
 	}
 
 	app.Action = func(c *cli.Context) error {
-		log.SetFlags(log.Lshortfile)
-		slack_token := os.Getenv("SLACK_TOKEN")
-		slack_channel := os.Getenv("SLACK_CHANNEL_NAME")
-
-		var cfg config.Config
-		_, err := toml.DecodeFile(c.String("config"), &cfg)
-		if err != nil {
-			return err
-		}
-		if cfg.Include != "" {
-			if err := includeConfigFile(&cfg, cfg.Include); err != nil {
-				return err
-			}
-		}
-
-		api := slack.New(slack_token)
-		params := slack.PostMessageParameters{
-			Username:  cfg.Username,
-			IconEmoji: cfg.IconEmoji,
-		}
-
-		osAuthUrl := os.Getenv("OS_AUTH_URL")
-		osUsername := os.Getenv("OS_USERNAME")
-		osPassword := os.Getenv("OS_PASSWORD")
-		osRegionName := os.Getenv("OS_REGION_NAME")
-		osProjectName := os.Getenv("OS_PROJECT_NAME")
-		osCert := os.Getenv("OS_CERT")
-		osKey := os.Getenv("OS_KEY")
-
-		opts := gophercloud.AuthOptions{
-			IdentityEndpoint: osAuthUrl,
-			Username:         osUsername,
-			Password:         osPassword,
-			DomainName:       "Default",
-			TenantName:       osProjectName,
-		}
-
-		client, err := openstack.Authenticate(opts, osCert, osKey)
-		if err != nil {
-			return err
-		}
-
-		ps, err := openstack.FetchProjects(client, gophercloud.EndpointOpts{Region: osRegionName})
-		if err != nil {
-			return err
-		}
-
-		for i, rule := range cfg.Rules {
-			for _, p := range ps {
-				if rule.Tenant == p.Name {
-					cfg.Rules[i].TenantID = p.ID
-				}
-			}
-		}
-
-		securityGroups, err := openstack.FetchSecurityGroups(client, gophercloud.EndpointOpts{Region: osRegionName})
-		if err != nil {
-			return err
-		}
-		for _, sg := range securityGroups {
-			for _, rule := range sg.Rules {
-				if rule.RemoteIPPrefix == "0.0.0.0/0" && rule.Protocol == "tcp" {
-					ports := []string{}
-					if !matchAllowdRule(cfg.Rules, sg, rule) {
-						projectName, err := getProjectNameFromID(sg.TenantID, ps)
-						if err != nil {
-							return err
-						}
-						fmt.Printf("[[rules]]\n")
-						fmt.Printf("tenant = \"%s\"\n", projectName)
-						fmt.Printf("sg = \"%s\"\n", sg.Name)
-						if rule.PortRangeMin == rule.PortRangeMax {
-							ports = append(ports, fmt.Sprintf("\"%d\"", rule.PortRangeMin))
-						} else {
-							ports = append(ports, fmt.Sprintf("\"%d-%d\"", rule.PortRangeMin, rule.PortRangeMax))
-						}
-
-						attachment := slack.Attachment{
-							Title: fmt.Sprintf("テナント: %s", projectName),
-							Text:  fmt.Sprintf("SecurityGroup: %s\nPortRange: %d-%d", sg.Name, rule.PortRangeMin, rule.PortRangeMax),
-							Color: "#ff6347",
-						}
-						params.Attachments = append(params.Attachments, attachment)
-						if len(params.Attachments) == 20 {
-							if !c.Bool("dry-run") {
-								err := postMessage(api, slack_channel, params)
-								if err != nil {
-									return err
-								}
-							}
-							params.Attachments = []slack.Attachment{}
-						}
-					}
-					if len(ports) > 0 {
-						fmt.Printf("port = [%s]\n\n", strings.Join(ports, ", "))
-					}
-				}
-			}
-		}
-
-		if !c.Bool("dry-run") {
-			err = postMessage(api, slack_channel, params)
-			if err != nil {
-				return err
-			}
-		}
-
-		return nil
+		return action(c)
 	}
+
 	err := app.Run(os.Args)
 	if err != nil {
 		log.Fatal(err)
 	}
 }
 
+func action(c *cli.Context) error {
+	log.SetFlags(log.Lshortfile)
+	slack_token := os.Getenv("SLACK_TOKEN")
+	slack_channel := os.Getenv("SLACK_CHANNEL_NAME")
+
+	var cfg config.Config
+	_, err := toml.DecodeFile(c.String("config"), &cfg)
+	if err != nil {
+		return err
+	}
+	if cfg.Include != "" {
+		if err := includeConfigFile(&cfg, cfg.Include); err != nil {
+			return err
+		}
+	}
+
+	api := slack.New(slack_token)
+	params := slack.PostMessageParameters{
+		Username:  cfg.Username,
+		IconEmoji: cfg.IconEmoji,
+	}
+
+	osAuthUrl := os.Getenv("OS_AUTH_URL")
+	osUsername := os.Getenv("OS_USERNAME")
+	osPassword := os.Getenv("OS_PASSWORD")
+	osRegionName := os.Getenv("OS_REGION_NAME")
+	osProjectName := os.Getenv("OS_PROJECT_NAME")
+	osCert := os.Getenv("OS_CERT")
+	osKey := os.Getenv("OS_KEY")
+
+	opts := gophercloud.AuthOptions{
+		IdentityEndpoint: osAuthUrl,
+		Username:         osUsername,
+		Password:         osPassword,
+		DomainName:       "Default",
+		TenantName:       osProjectName,
+	}
+
+	client, err := openstack.Authenticate(opts, osCert, osKey)
+	if err != nil {
+		return err
+	}
+
+	ps, err := openstack.FetchProjects(client, gophercloud.EndpointOpts{Region: osRegionName})
+	if err != nil {
+		return err
+	}
+
+	for i, rule := range cfg.Rules {
+		for _, p := range ps {
+			if rule.Tenant == p.Name {
+				cfg.Rules[i].TenantID = p.ID
+			}
+		}
+	}
+
+	securityGroups, err := openstack.FetchSecurityGroups(client, gophercloud.EndpointOpts{Region: osRegionName})
+	if err != nil {
+		return err
+	}
+	for _, sg := range securityGroups {
+		for _, rule := range sg.Rules {
+			if rule.RemoteIPPrefix == "0.0.0.0/0" && rule.Protocol == "tcp" {
+				ports := []string{}
+				if !matchAllowdRule(cfg.Rules, sg, rule) {
+					projectName, err := getProjectNameFromID(sg.TenantID, ps)
+					if err != nil {
+						return err
+					}
+					fmt.Printf("[[rules]]\n")
+					fmt.Printf("tenant = \"%s\"\n", projectName)
+					fmt.Printf("sg = \"%s\"\n", sg.Name)
+					if rule.PortRangeMin == rule.PortRangeMax {
+						ports = append(ports, fmt.Sprintf("\"%d\"", rule.PortRangeMin))
+					} else {
+						ports = append(ports, fmt.Sprintf("\"%d-%d\"", rule.PortRangeMin, rule.PortRangeMax))
+					}
+
+					attachment := slack.Attachment{
+						Title: fmt.Sprintf("テナント: %s", projectName),
+						Text:  fmt.Sprintf("SecurityGroup: %s\nPortRange: %d-%d", sg.Name, rule.PortRangeMin, rule.PortRangeMax),
+						Color: "#ff6347",
+					}
+					params.Attachments = append(params.Attachments, attachment)
+					if len(params.Attachments) == 20 {
+						if !c.Bool("dry-run") {
+							err := postMessage(api, slack_channel, params)
+							if err != nil {
+								return err
+							}
+						}
+						params.Attachments = []slack.Attachment{}
+					}
+				}
+				if len(ports) > 0 {
+					fmt.Printf("port = [%s]\n\n", strings.Join(ports, ", "))
+				}
+			}
+		}
+	}
+
+	if !c.Bool("dry-run") {
+		err = postMessage(api, slack_channel, params)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
 func postMessage(api *slack.Client, channel string, params slack.PostMessageParameters) error {
 	_, _, err := api.PostMessage(channel, "全解放しているセキュリティグループがあるように見えるぞ！大丈夫？？？", params)
 	if err != nil {
