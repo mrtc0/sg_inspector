@@ -128,6 +128,11 @@ func main() {
 			Name:  "config, c",
 			Value: "config.yaml",
 		},
+		cli.BoolFlag{
+			Name:   "dry-run",
+			Usage:  "when this is true, does't post message to slack",
+			Hidden: false,
+		},
 	}
 
 	app.Action = func(c *cli.Context) error {
@@ -215,9 +220,11 @@ func main() {
 						}
 						params.Attachments = append(params.Attachments, attachment)
 						if len(params.Attachments) == 20 {
-							err := postMessage(api, slack_channel, params)
-							if err != nil {
-								return err
+							if !c.Bool("dry-run") {
+								err := postMessage(api, slack_channel, params)
+								if err != nil {
+									return err
+								}
 							}
 							params.Attachments = []slack.Attachment{}
 						}
@@ -229,9 +236,11 @@ func main() {
 			}
 		}
 
-		err = postMessage(api, slack_channel, params)
-		if err != nil {
-			return err
+		if !c.Bool("dry-run") {
+			err = postMessage(api, slack_channel, params)
+			if err != nil {
+				return err
+			}
 		}
 
 		return nil
