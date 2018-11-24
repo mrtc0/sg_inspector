@@ -42,6 +42,20 @@ func includeConfigFile(cfg *config.Config, include string) error {
 	return nil
 }
 
+func readConfigFile(cfgPath string) (config.Config, error) {
+	var cfg config.Config
+	_, err := toml.DecodeFile(cfgPath, &cfg)
+	if err != nil {
+		return cfg, err
+	}
+	if cfg.Include != "" {
+		if err := includeConfigFile(&cfg, cfg.Include); err != nil {
+			return cfg, err
+		}
+	}
+	return cfg, err
+}
+
 func main() {
 	app := cli.NewApp()
 	app.Flags = []cli.Flag{
@@ -71,15 +85,9 @@ func action(c *cli.Context) error {
 	slack_token := os.Getenv("SLACK_TOKEN")
 	slack_channel := os.Getenv("SLACK_CHANNEL_NAME")
 
-	var cfg config.Config
-	_, err := toml.DecodeFile(c.String("config"), &cfg)
+	cfg, err := readConfigFile(c.String("config"))
 	if err != nil {
 		return err
-	}
-	if cfg.Include != "" {
-		if err := includeConfigFile(&cfg, cfg.Include); err != nil {
-			return err
-		}
 	}
 
 	api := slack.New(slack_token)
