@@ -124,7 +124,7 @@ func getProjectNameFromID(id string, ps []projects.Project) (string, error) {
 
 func matchAllowdRule(allowdRules []config.Rule, sg groups.SecGroup, rule rules.SecGroupRule) bool {
 	for _, allowdRule := range allowdRules {
-		if allowdRule.TenantID == rule.TenantID && allowdRule.SG == sg.Name {
+		if allowdRule.TenantID == sg.TenantID && allowdRule.SG == sg.Name {
 			r := regexp.MustCompile(`(\d*)-(\d*)`)
 			for _, port := range allowdRule.Port {
 				if r.MatchString(port) {
