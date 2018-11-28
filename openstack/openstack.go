@@ -57,7 +57,7 @@ func (checker *OpenStackSecurityGroupChecker) CheckSecurityGroups() error {
 	}
 	for _, sg := range securityGroups {
 		for _, rule := range sg.Rules {
-			if rule.RemoteIPPrefix == "0.0.0.0/0" && rule.Protocol == "tcp" {
+			if rule.RemoteIPPrefix == "0.0.0.0/0" && rule.Protocol == "tcp"  && rule.Direction == "ingress"{
 				ports := []string{}
 				if !matchAllowdRule(checker.Cfg.Rules, sg, rule) {
 					projectName, err := getProjectNameFromID(sg.TenantID, ps)
