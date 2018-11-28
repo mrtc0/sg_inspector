@@ -12,6 +12,7 @@ import (
 	"github.com/nlopes/slack"
 	"github.com/takaishi/noguard_sg_checker/config"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -79,28 +80,28 @@ func (checker *OpenStackSecurityGroupChecker) CheckSecurityGroups() error {
 						Color: "#ff6347",
 					}
 					params.Attachments = append(params.Attachments, attachment)
-					if len(params.Attachments) == 20 {
-						if !checker.Cfg.DryRun {
-							err := postMessage(checker.SlackClient, checker.Cfg.SlackChannel, params)
-							if err != nil {
-								return err
-							}
+					if !checker.Cfg.DryRun && len(params.Attachments) == 20 {
+						err := postMessage(checker.SlackClient, checker.Cfg.SlackChannel, params)
+						if err != nil {
+							return err
 						}
 						params.Attachments = []slack.Attachment{}
 					}
 				}
-				if len(ports) > 0 {
+				if len(params.Attachments) > 0 {
 					fmt.Printf("port = [%s]\n\n", strings.Join(ports, ", "))
 				}
 			}
 		}
 	}
 
-	if !checker.Cfg.DryRun {
+	if !checker.Cfg.DryRun && len(params.Attachments) > 0 {
 		err = postMessage(checker.SlackClient, checker.Cfg.SlackChannel, params)
 		if err != nil {
 			return err
 		}
+	} else {
+		log.Printf("[INFO] 一時的に全解放しているセキュリティグループはありませんでした")
 	}
 
 	return nil
