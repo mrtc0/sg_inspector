@@ -37,7 +37,7 @@ func main() {
 }
 
 func action(c *cli.Context) error {
-	log.SetFlags(log.Lshortfile)
+	log.SetFlags(log.Lshortfile | log.Ldate | log.Ltime)
 	slack_token := os.Getenv("SLACK_TOKEN")
 
 	cfg, err := config.ReadConfigFile(c.String("config"))
