@@ -14,5 +14,6 @@ RUN go build
 
 FROM alpine:3.8 as app
 WORKDIR /
+COPY --from=build /go/src/git.pepabo.com/takaishi/noguard_sg_checker/noguard_sg_checker /noguard_sg_checker
 
 ENTRYPOINT ["/noguard_sg_checker", "--config", "/config.toml"]
