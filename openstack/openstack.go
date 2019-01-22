@@ -59,12 +59,11 @@ func (checker *OpenStackSecurityGroupChecker) CheckSecurityGroups() error {
 			if rule.RemoteIPPrefix == "0.0.0.0/0" && rule.Protocol == "tcp" && rule.Direction == "ingress" {
 				ports := []string{}
 				if !matchAllowdRule(checker.Cfg.Rules, sg, rule) {
-					existNoguardSG = true
-
 					if contain(checker.Cfg.TemporaryAllowdSecurityGroups, sg.ID) {
 						log.Printf("許可済みのSGなのでSlackに警告メッセージは流さない")
 						continue
 					}
+					existNoguardSG = true
 
 					projectName, err := getProjectNameFromID(sg.TenantID, ps)
 					if err != nil {
