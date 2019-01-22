@@ -13,6 +13,7 @@ RUN go get
 RUN go build
 
 FROM alpine:3.8 as app
+RUN apk --no-cache add ca-certificates
 WORKDIR /
 COPY --from=build /go/src/git.pepabo.com/takaishi/noguard_sg_checker/noguard_sg_checker /noguard_sg_checker
 
