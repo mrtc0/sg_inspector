@@ -29,7 +29,7 @@ type OpenStackSecurityGroupChecker struct {
 
 func (checker *OpenStackSecurityGroupChecker) CheckSecurityGroups() error {
 	log.Printf("%+v\n", checker.Cfg.TemporaryAllowdSecurityGroups)
-	existNoguardSG := true
+	existNoguardSG := false
 	attachments := []slack.Attachment{}
 	eo := gophercloud.EndpointOpts{Region: checker.RegionName}
 	client, err := checker.Authenticate(checker.AuthOptions, checker.Cert, checker.Key)
