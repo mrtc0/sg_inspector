@@ -125,6 +125,15 @@ func action(c *cli.Context) error {
 									log.Printf("%+v\n", f.Value)
 									checker.Cfg.TemporaryAllowdSecurityGroups = append(checker.Cfg.TemporaryAllowdSecurityGroups, f.Value)
 									log.Printf("%+v\n", checker.Cfg.TemporaryAllowdSecurityGroups)
+									params := slack.PostMessageParameters{
+										Username:        checker.Cfg.Username,
+										IconEmoji:       checker.Cfg.IconEmoji,
+										ThreadTimestamp: ev.Item.Timestamp,
+									}
+									_, _, err := api.PostMessage(checker.Cfg.SlackChannel, "明日の10時までは許可しますね〜", params)
+									if err != nil {
+										return err
+									}
 								}
 							}
 						}
