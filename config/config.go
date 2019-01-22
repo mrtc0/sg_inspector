@@ -6,13 +6,13 @@ import (
 )
 
 type Config struct {
-	DryRun       bool
-	Rules        []Rule
-	Username     string `toml:"username"`
-	IconEmoji    string `toml:"icon_emoji"`
+	DryRun        bool
+	Rules         []Rule
+	Username      string `toml:"username"`
+	IconEmoji     string `toml:"icon_emoji"`
 	CheckInterval string `toml:"check_interval"`
-	Include      string
-	SlackChannel string
+	Include       string
+	SlackChannel  string
 }
 
 type Rule struct {

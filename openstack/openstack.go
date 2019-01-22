@@ -10,6 +10,7 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/rules"
 	"github.com/gophercloud/gophercloud/pagination"
 	"github.com/nlopes/slack"
+	"github.com/robfig/cron"
 	"github.com/takaishi/noguard_sg_checker/config"
 	"io/ioutil"
 	"log"
@@ -17,7 +18,6 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"github.com/robfig/cron"
 )
 
 type OpenStackSecurityGroupChecker struct {
@@ -67,7 +67,7 @@ func (checker *OpenStackSecurityGroupChecker) CheckSecurityGroups() error {
 	}
 	for _, sg := range securityGroups {
 		for _, rule := range sg.Rules {
-			if rule.RemoteIPPrefix == "0.0.0.0/0" && rule.Protocol == "tcp"  && rule.Direction == "ingress"{
+			if rule.RemoteIPPrefix == "0.0.0.0/0" && rule.Protocol == "tcp" && rule.Direction == "ingress" {
 				ports := []string{}
 				if !matchAllowdRule(checker.Cfg.Rules, sg, rule) {
 					projectName, err := getProjectNameFromID(sg.TenantID, ps)
