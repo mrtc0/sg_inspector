@@ -132,25 +132,13 @@ func (checker *OpenStackSecurityGroupChecker) postWarning(attachments []slack.At
 
 	for _, item := range attachments {
 		params := slack.PostMessageParameters{
-			Username:  checker.Cfg.Username,
-			IconEmoji: checker.Cfg.IconEmoji,
+			Username:    checker.Cfg.Username,
+			IconEmoji:   checker.Cfg.IconEmoji,
 			Attachments: []slack.Attachment{item},
 		}
 		err = postMessage(checker.SlackClient, checker.Cfg.SlackChannel, "", params)
 		if err != nil {
 			return err
-		}
-
-		for _, item := range attachments {
-			params := slack.PostMessageParameters{
-				Username:    checker.Cfg.Username,
-				IconEmoji:   checker.Cfg.IconEmoji,
-				Attachments: []slack.Attachment{item},
-			}
-			err = postMessage(checker.SlackClient, checker.Cfg.SlackChannel, "", params)
-			if err != nil {
-				return err
-			}
 		}
 	}
 
