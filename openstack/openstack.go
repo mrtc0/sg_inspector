@@ -10,7 +10,6 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/rules"
 	"github.com/gophercloud/gophercloud/pagination"
 	"github.com/nlopes/slack"
-	"github.com/robfig/cron"
 	"github.com/takaishi/noguard_sg_checker/config"
 	"io/ioutil"
 	"log"
@@ -26,14 +25,6 @@ type OpenStackSecurityGroupChecker struct {
 	RegionName  string
 	Cert        string
 	Key         string
-}
-
-func (checker *OpenStackSecurityGroupChecker) Start() error {
-	server := cron.New()
-	server.AddFunc(checker.Cfg.CheckInterval, func() { checker.CheckSecurityGroups() })
-	server.Run()
-
-	return nil
 }
 
 func (checker *OpenStackSecurityGroupChecker) CheckSecurityGroups() error {

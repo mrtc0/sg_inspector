@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/gophercloud/gophercloud"
 	"github.com/nlopes/slack"
+	"github.com/robfig/cron"
 	"github.com/takaishi/noguard_sg_checker/config"
 	"github.com/takaishi/noguard_sg_checker/openstack"
 	"github.com/urfave/cli"
@@ -80,7 +81,9 @@ func action(c *cli.Context) error {
 		Key:         osKey,
 	}
 
-	go checker.Start()
+	server := cron.New()
+	server.AddFunc(checker.Cfg.CheckInterval, func() { checker.CheckSecurityGroups() })
+	go server.Run()
 
 	for {
 		select {
