@@ -92,13 +92,22 @@ func (checker *OpenStackSecurityGroupChecker) CheckSecurityGroups() error {
 		}
 	}
 	if existNoguardSG {
+		params := slack.PostMessageParameters{
+			Username:  checker.Cfg.Username,
+			IconEmoji: checker.Cfg.IconEmoji,
+		}
+		err = postMessage(checker.SlackClient, checker.Cfg.SlackChannel, "全解放しているセキュリティグループがあるように見えるぞ！大丈夫？？？", params)
+		if err != nil {
+			return err
+		}
+
 		for _, item := range attachments {
 			params := slack.PostMessageParameters{
 				Username:    checker.Cfg.Username,
 				IconEmoji:   checker.Cfg.IconEmoji,
 				Attachments: []slack.Attachment{item},
 			}
-			err = postMessage(checker.SlackClient, checker.Cfg.SlackChannel, "全解放しているセキュリティグループがあるように見えるぞ！大丈夫？？？", params)
+			err = postMessage(checker.SlackClient, checker.Cfg.SlackChannel, "", params)
 			if err != nil {
 				return err
 			}
