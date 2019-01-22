@@ -131,7 +131,7 @@ func (checker *OpenStackSecurityGroupChecker) postWarning(attachments []slack.At
 			return err
 		}
 	}
-	err = postMessage(checker.SlackClient, checker.Cfg.SlackChannel, "今後も解放しておく場合は https://git.pepabo.com/bots/noguard_sg_checker に許可設定を追加してね 一時的に許可したい場合は :white_check_mark: をつけてくれ！", params)
+	err = postMessage(checker.SlackClient, checker.Cfg.SlackChannel, checker.Cfg.FinishMessage, params)
 	if err != nil {
 		return err
 	}

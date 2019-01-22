@@ -14,6 +14,7 @@ type Config struct {
 	Include                       string
 	SlackChannel                  string
 	TemporaryAllowdSecurityGroups []string
+	FinishMessage                 string `toml:"finish_message"`
 }
 
 type Rule struct {

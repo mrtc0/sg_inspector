@@ -86,7 +86,8 @@ func action(c *cli.Context) error {
 		err := checker.CheckSecurityGroups()
 		if err != nil {
 			log.Printf("[ERROR] %+v\n", err)
-		}})
+		}
+	})
 	server.AddFunc("0 0 10 * * *", func() {
 		log.Printf("一時的に許可していたSGをリセットします")
 		checker.Cfg.TemporaryAllowdSecurityGroups = []string{}
