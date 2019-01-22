@@ -83,6 +83,10 @@ func action(c *cli.Context) error {
 
 	server := cron.New()
 	server.AddFunc(checker.Cfg.CheckInterval, func() { checker.CheckSecurityGroups() })
+	server.AddFunc("0 0 10 * * *", func() {
+		log.Printf("一時的に許可していたSGをリセットします")
+		checker.Cfg.TemporaryAllowdSecurityGroups = []string{}
+	})
 	go server.Run()
 
 	for {
