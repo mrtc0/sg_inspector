@@ -17,7 +17,6 @@ import (
 	"net/http"
 	"regexp"
 	"strconv"
-	"strings"
 )
 
 type OpenStackSecurityGroupChecker struct {
@@ -38,11 +37,8 @@ func (checker *OpenStackSecurityGroupChecker) Start() error {
 }
 
 func (checker *OpenStackSecurityGroupChecker) CheckSecurityGroups() error {
+	existNoguardSG := true
 	eo := gophercloud.EndpointOpts{Region: checker.RegionName}
-	params := slack.PostMessageParameters{
-		Username:  checker.Cfg.Username,
-		IconEmoji: checker.Cfg.IconEmoji,
-	}
 	client, err := checker.Authenticate(checker.AuthOptions, checker.Cert, checker.Key)
 	if err != nil {
 		return err
@@ -70,6 +66,11 @@ func (checker *OpenStackSecurityGroupChecker) CheckSecurityGroups() error {
 			if rule.RemoteIPPrefix == "0.0.0.0/0" && rule.Protocol == "tcp" && rule.Direction == "ingress" {
 				ports := []string{}
 				if !matchAllowdRule(checker.Cfg.Rules, sg, rule) {
+					existNoguardSG = true
+					params := slack.PostMessageParameters{
+						Username:  checker.Cfg.Username,
+						IconEmoji: checker.Cfg.IconEmoji,
+					}
 					projectName, err := getProjectNameFromID(sg.TenantID, ps)
 					if err != nil {
 						return err
@@ -89,32 +90,21 @@ func (checker *OpenStackSecurityGroupChecker) CheckSecurityGroups() error {
 						Color: "#ff6347",
 					}
 					params.Attachments = append(params.Attachments, attachment)
-					if !checker.Cfg.DryRun && len(params.Attachments) == 20 {
-						err := postMessage(checker.SlackClient, checker.Cfg.SlackChannel, params)
-						if err != nil {
-							return err
-						}
-						params.Attachments = []slack.Attachment{}
+					err = postMessage(checker.SlackClient, checker.Cfg.SlackChannel, params)
+					if err != nil {
+						return err
 					}
-				}
-				if len(params.Attachments) > 0 {
-					fmt.Printf("port = [%s]\n\n", strings.Join(ports, ", "))
 				}
 			}
 		}
 	}
-
-	if !checker.Cfg.DryRun && len(params.Attachments) > 0 {
-		err = postMessage(checker.SlackClient, checker.Cfg.SlackChannel, params)
-		if err != nil {
-			return err
-		}
-	} else {
+	if !existNoguardSG {
 		log.Printf("[INFO] 一時的に全解放しているセキュリティグループはありませんでした")
 	}
 
 	return nil
 }
+
 func postMessage(api *slack.Client, channel string, params slack.PostMessageParameters) error {
 	_, _, err := api.PostMessage(channel, "全解放しているセキュリティグループがあるように見えるぞ！大丈夫？？？", params)
 	if err != nil {
