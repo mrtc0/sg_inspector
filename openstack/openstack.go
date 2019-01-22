@@ -17,6 +17,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"github.com/robfig/cron"
 )
 
 type OpenStackSecurityGroupChecker struct {
@@ -26,6 +27,14 @@ type OpenStackSecurityGroupChecker struct {
 	RegionName  string
 	Cert        string
 	Key         string
+}
+
+func (checker *OpenStackSecurityGroupChecker) Start() error {
+	server := cron.New()
+	server.AddFunc(checker.Cfg.CheckInterval, func() { checker.CheckSecurityGroups() })
+	server.Run()
+
+	return nil
 }
 
 func (checker *OpenStackSecurityGroupChecker) CheckSecurityGroups() error {

@@ -74,10 +74,7 @@ func action(c *cli.Context) error {
 		Key:         osKey,
 	}
 
-	err = checker.CheckSecurityGroups()
-	if err != nil {
-		return err
-	}
+	checker.Start()
 
 	return nil
 }
