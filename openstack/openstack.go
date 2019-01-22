@@ -10,7 +10,6 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/rules"
 	"github.com/gophercloud/gophercloud/pagination"
 	"github.com/nlopes/slack"
-	"github.com/robfig/cron"
 	"github.com/takaishi/noguard_sg_checker/config"
 	"io/ioutil"
 	"log"
@@ -28,15 +27,8 @@ type OpenStackSecurityGroupChecker struct {
 	Key         string
 }
 
-func (checker *OpenStackSecurityGroupChecker) Start() error {
-	server := cron.New()
-	server.AddFunc(checker.Cfg.CheckInterval, func() { checker.CheckSecurityGroups() })
-	server.Run()
-
-	return nil
-}
-
 func (checker *OpenStackSecurityGroupChecker) CheckSecurityGroups() error {
+	log.Printf("%+v\n", checker.Cfg.TemporaryAllowdSecurityGroups)
 	existNoguardSG := true
 	attachments := []slack.Attachment{}
 	eo := gophercloud.EndpointOpts{Region: checker.RegionName}
@@ -67,7 +59,12 @@ func (checker *OpenStackSecurityGroupChecker) CheckSecurityGroups() error {
 			if rule.RemoteIPPrefix == "0.0.0.0/0" && rule.Protocol == "tcp" && rule.Direction == "ingress" {
 				ports := []string{}
 				if !matchAllowdRule(checker.Cfg.Rules, sg, rule) {
+					if contain(checker.Cfg.TemporaryAllowdSecurityGroups, sg.ID) {
+						log.Printf("許可済みのSGなのでSlackに警告メッセージは流さない")
+						continue
+					}
 					existNoguardSG = true
+
 					projectName, err := getProjectNameFromID(sg.TenantID, ps)
 					if err != nil {
 						return err
@@ -81,10 +78,15 @@ func (checker *OpenStackSecurityGroupChecker) CheckSecurityGroups() error {
 						ports = append(ports, fmt.Sprintf("\"%d-%d\"", rule.PortRangeMin, rule.PortRangeMax))
 					}
 
+					fields := []slack.AttachmentField{
+						{Title: "Tenant", Value: projectName},
+						{Title: "ID", Value: sg.ID},
+						{Title: "Name", Value: sg.Name},
+						{Title: "PortRange", Value: fmt.Sprintf("%d-%d", rule.PortRangeMin, rule.PortRangeMax)},
+					}
 					attachment := slack.Attachment{
-						Title: fmt.Sprintf("テナント: %s", projectName),
-						Text:  fmt.Sprintf("SecurityGroup: %s\nPortRange: %d-%d", sg.Name, rule.PortRangeMin, rule.PortRangeMax),
-						Color: "#ff6347",
+						Color:  "#ff6347",
+						Fields: fields,
 					}
 					attachments = append(attachments, attachment)
 				}
@@ -92,28 +94,46 @@ func (checker *OpenStackSecurityGroupChecker) CheckSecurityGroups() error {
 		}
 	}
 	if existNoguardSG {
-		params := slack.PostMessageParameters{
-			Username:  checker.Cfg.Username,
-			IconEmoji: checker.Cfg.IconEmoji,
+		return checker.postWarning(attachments)
+	} else {
+		log.Printf("[INFO] 一時的に全解放しているセキュリティグループはありませんでした")
+		return nil
+	}
+}
+
+func contain(s []string, e string) bool {
+	for _, a := range s {
+		if a == e {
+			return true
 		}
-		err = postMessage(checker.SlackClient, checker.Cfg.SlackChannel, "全解放しているセキュリティグループがあるように見えるぞ！大丈夫？？？", params)
+	}
+	return false
+}
+
+func (checker *OpenStackSecurityGroupChecker) postWarning(attachments []slack.Attachment) error {
+	params := slack.PostMessageParameters{
+		Username:  checker.Cfg.Username,
+		IconEmoji: checker.Cfg.IconEmoji,
+	}
+	err := postMessage(checker.SlackClient, checker.Cfg.SlackChannel, "全解放しているセキュリティグループがあるように見えるぞ！大丈夫？？？", params)
+	if err != nil {
+		return err
+	}
+
+	for _, item := range attachments {
+		params := slack.PostMessageParameters{
+			Username:    checker.Cfg.Username,
+			IconEmoji:   checker.Cfg.IconEmoji,
+			Attachments: []slack.Attachment{item},
+		}
+		err = postMessage(checker.SlackClient, checker.Cfg.SlackChannel, "", params)
 		if err != nil {
 			return err
 		}
-
-		for _, item := range attachments {
-			params := slack.PostMessageParameters{
-				Username:    checker.Cfg.Username,
-				IconEmoji:   checker.Cfg.IconEmoji,
-				Attachments: []slack.Attachment{item},
-			}
-			err = postMessage(checker.SlackClient, checker.Cfg.SlackChannel, "", params)
-			if err != nil {
-				return err
-			}
-		}
-	} else {
-		log.Printf("[INFO] 一時的に全解放しているセキュリティグループはありませんでした")
+	}
+	err = postMessage(checker.SlackClient, checker.Cfg.SlackChannel, "今後も解放しておく場合は https://git.pepabo.com/bots/noguard_sg_checker に許可設定を追加してね 一時的に許可したい場合は :white_check_mark: をつけてくれ！", params)
+	if err != nil {
+		return err
 	}
 
 	return nil
