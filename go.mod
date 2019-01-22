@@ -5,6 +5,7 @@ require (
 	github.com/gophercloud/gophercloud v0.0.0-20181114204705-3a7818a07cfc
 	github.com/gorilla/websocket v1.4.0 // indirect
 	github.com/nlopes/slack v0.4.0
-	github.com/pkg/errors v0.8.0 // indirect
+	github.com/pkg/errors v0.8.0
+	github.com/robfig/cron v0.0.0-20180505203441-b41be1df6967
 	github.com/urfave/cli v1.20.0
 )

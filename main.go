@@ -17,7 +17,7 @@ func main() {
 	app.Flags = []cli.Flag{
 		cli.StringFlag{
 			Name:  "config, c",
-			Value: "config.yaml",
+			Value: "config.toml",
 		},
 		cli.BoolFlag{
 			Name:   "dry-run",
@@ -74,10 +74,7 @@ func action(c *cli.Context) error {
 		Key:         osKey,
 	}
 
-	err = checker.CheckSecurityGroups()
-	if err != nil {
-		return err
-	}
+	checker.Start()
 
 	return nil
 }
