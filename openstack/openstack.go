@@ -37,6 +37,7 @@ func (checker *OpenStackSecurityGroupChecker) Start() error {
 }
 
 func (checker *OpenStackSecurityGroupChecker) CheckSecurityGroups() error {
+	log.Printf("%+v\n", checker.Cfg.TemporaryAllowdSecurityGroups)
 	existNoguardSG := true
 	attachments := []slack.Attachment{}
 	eo := gophercloud.EndpointOpts{Region: checker.RegionName}
@@ -68,6 +69,12 @@ func (checker *OpenStackSecurityGroupChecker) CheckSecurityGroups() error {
 				ports := []string{}
 				if !matchAllowdRule(checker.Cfg.Rules, sg, rule) {
 					existNoguardSG = true
+
+					if contain(checker.Cfg.TemporaryAllowdSecurityGroups, sg.ID) {
+						log.Printf("許可済みのSGなのでSlackに警告メッセージは流さない")
+						continue
+					}
+
 					projectName, err := getProjectNameFromID(sg.TenantID, ps)
 					if err != nil {
 						return err
@@ -81,10 +88,15 @@ func (checker *OpenStackSecurityGroupChecker) CheckSecurityGroups() error {
 						ports = append(ports, fmt.Sprintf("\"%d-%d\"", rule.PortRangeMin, rule.PortRangeMax))
 					}
 
+					fields := []slack.AttachmentField{
+						{Title: "Tenant", Value: projectName},
+						{Title: "ID", Value: sg.ID},
+						{Title: "Name", Value: sg.Name},
+						{Title: "PortRange", Value: fmt.Sprintf("%d-%d", rule.PortRangeMin, rule.PortRangeMax)},
+					}
 					attachment := slack.Attachment{
-						Title: fmt.Sprintf("テナント: %s", projectName),
-						Text:  fmt.Sprintf("SecurityGroup: %s\nPortRange: %d-%d", sg.Name, rule.PortRangeMin, rule.PortRangeMax),
-						Color: "#ff6347",
+						Color:  "#ff6347",
+						Fields: fields,
 					}
 					attachments = append(attachments, attachment)
 				}
@@ -92,11 +104,39 @@ func (checker *OpenStackSecurityGroupChecker) CheckSecurityGroups() error {
 		}
 	}
 	if existNoguardSG {
+		return checker.postWarning(attachments)
+	} else {
+		log.Printf("[INFO] 一時的に全解放しているセキュリティグループはありませんでした")
+		return nil
+	}
+}
+
+func contain(s []string, e string) bool {
+	for _, a := range s {
+		if a == e {
+			return true
+		}
+	}
+	return false
+}
+
+func (checker *OpenStackSecurityGroupChecker) postWarning(attachments []slack.Attachment) error {
+	params := slack.PostMessageParameters{
+		Username:  checker.Cfg.Username,
+		IconEmoji: checker.Cfg.IconEmoji,
+	}
+	err := postMessage(checker.SlackClient, checker.Cfg.SlackChannel, "全解放しているセキュリティグループがあるように見えるぞ！大丈夫？？？", params)
+	if err != nil {
+		return err
+	}
+
+	for _, item := range attachments {
 		params := slack.PostMessageParameters{
 			Username:  checker.Cfg.Username,
 			IconEmoji: checker.Cfg.IconEmoji,
+			Attachments: []slack.Attachment{item},
 		}
-		err = postMessage(checker.SlackClient, checker.Cfg.SlackChannel, "全解放しているセキュリティグループがあるように見えるぞ！大丈夫？？？", params)
+		err = postMessage(checker.SlackClient, checker.Cfg.SlackChannel, "", params)
 		if err != nil {
 			return err
 		}
@@ -112,8 +152,6 @@ func (checker *OpenStackSecurityGroupChecker) CheckSecurityGroups() error {
 				return err
 			}
 		}
-	} else {
-		log.Printf("[INFO] 一時的に全解放しているセキュリティグループはありませんでした")
 	}
 
 	return nil
