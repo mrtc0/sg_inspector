@@ -38,6 +38,7 @@ func (checker *OpenStackSecurityGroupChecker) Start() error {
 
 func (checker *OpenStackSecurityGroupChecker) CheckSecurityGroups() error {
 	existNoguardSG := true
+	attachments := []slack.Attachment{}
 	eo := gophercloud.EndpointOpts{Region: checker.RegionName}
 	client, err := checker.Authenticate(checker.AuthOptions, checker.Cert, checker.Key)
 	if err != nil {
@@ -67,10 +68,6 @@ func (checker *OpenStackSecurityGroupChecker) CheckSecurityGroups() error {
 				ports := []string{}
 				if !matchAllowdRule(checker.Cfg.Rules, sg, rule) {
 					existNoguardSG = true
-					params := slack.PostMessageParameters{
-						Username:  checker.Cfg.Username,
-						IconEmoji: checker.Cfg.IconEmoji,
-					}
 					projectName, err := getProjectNameFromID(sg.TenantID, ps)
 					if err != nil {
 						return err
@@ -89,24 +86,32 @@ func (checker *OpenStackSecurityGroupChecker) CheckSecurityGroups() error {
 						Text:  fmt.Sprintf("SecurityGroup: %s\nPortRange: %d-%d", sg.Name, rule.PortRangeMin, rule.PortRangeMax),
 						Color: "#ff6347",
 					}
-					params.Attachments = append(params.Attachments, attachment)
-					err = postMessage(checker.SlackClient, checker.Cfg.SlackChannel, params)
-					if err != nil {
-						return err
-					}
+					attachments = append(attachments, attachment)
 				}
 			}
 		}
 	}
-	if !existNoguardSG {
+	if existNoguardSG {
+		for _, item := range attachments {
+			params := slack.PostMessageParameters{
+				Username:    checker.Cfg.Username,
+				IconEmoji:   checker.Cfg.IconEmoji,
+				Attachments: []slack.Attachment{item},
+			}
+			err = postMessage(checker.SlackClient, checker.Cfg.SlackChannel, "全解放しているセキュリティグループがあるように見えるぞ！大丈夫？？？", params)
+			if err != nil {
+				return err
+			}
+		}
+	} else {
 		log.Printf("[INFO] 一時的に全解放しているセキュリティグループはありませんでした")
 	}
 
 	return nil
 }
 
-func postMessage(api *slack.Client, channel string, params slack.PostMessageParameters) error {
-	_, _, err := api.PostMessage(channel, "全解放しているセキュリティグループがあるように見えるぞ！大丈夫？？？", params)
+func postMessage(api *slack.Client, channel string, text string, params slack.PostMessageParameters) error {
+	_, _, err := api.PostMessage(channel, text, params)
 	if err != nil {
 		return err
 	}
