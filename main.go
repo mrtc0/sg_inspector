@@ -88,7 +88,7 @@ func action(c *cli.Context) error {
 			log.Printf("[ERROR] %+v\n", err)
 		}
 	})
-	server.AddFunc("0 0 10 * * *", func() {
+	server.AddFunc(checker.Cfg.ResetInterval, func() {
 		log.Printf("一時的に許可していたSGをリセットします")
 		checker.Cfg.TemporaryAllowdSecurityGroups = []string{}
 	})

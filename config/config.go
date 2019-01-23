@@ -11,6 +11,7 @@ type Config struct {
 	Username                      string `toml:"username"`
 	IconEmoji                     string `toml:"icon_emoji"`
 	CheckInterval                 string `toml:"check_interval"`
+	ResetInterval                 string `toml:"reset_interval"`
 	Include                       string
 	SlackChannel                  string
 	TemporaryAllowdSecurityGroups []string
