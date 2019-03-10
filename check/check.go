@@ -20,8 +20,6 @@ func Start(c *cli.Context) error {
 	}
 
 	api := slack.New(slack_token)
-	rtm := api.NewRTM()
-	go rtm.ManageConnection()
 
 	opts := gophercloud.AuthOptions{
 		IdentityEndpoint: cfg.OpenStack.AuthURL,
