@@ -15,6 +15,7 @@ type Config struct {
 	ResetInterval                 string `toml:"reset_interval"`
 	Include                       string
 	SlackChannel                  string
+	SlackToken                    string
 	TemporaryAllowdSecurityGroups []string
 	FinishMessage                 string `toml:"finish_message"`
 	OpenStack                     OpenStack
@@ -79,6 +80,7 @@ func ReadConfig(cfgPath string, dryRun bool) (Config, error) {
 
 	cfg.DryRun = dryRun
 	cfg.SlackChannel = os.Getenv("SLACK_CHANNEL_NAME")
+	cfg.SlackToken = os.Getenv("SLACK_TOKEN")
 
 	cfg.OpenStack.AuthURL = os.Getenv("OS_AUTH_URL")
 	cfg.OpenStack.Username = os.Getenv("OS_USERNAME")

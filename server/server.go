@@ -10,20 +10,16 @@ import (
 	"github.com/takaishi/noguard_sg_checker/openstack"
 	"github.com/urfave/cli"
 	"log"
-	"os"
 	"strconv"
 )
 
 func Start(c *cli.Context) error {
-
-	slack_token := os.Getenv("SLACK_TOKEN")
-
 	cfg, err := config.ReadConfig(c.String("config"), c.Bool("dry-run"))
 	if err != nil {
 		return err
 	}
 
-	api := slack.New(slack_token)
+	api := slack.New(cfg.SlackToken)
 	rtm := api.NewRTM()
 	go rtm.ManageConnection()
 
