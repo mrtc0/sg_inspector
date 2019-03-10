@@ -51,6 +51,12 @@ func main() {
 		},
 	}
 
+	app.Before = func(c *cli.Context) error {
+		log.SetFlags(log.Lshortfile | log.Ldate | log.Ltime)
+
+		return nil
+	}
+
 	err := app.Run(os.Args)
 	if err != nil {
 		log.Fatal(err)
