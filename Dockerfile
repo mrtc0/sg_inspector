@@ -17,4 +17,4 @@ RUN apk --no-cache add ca-certificates
 WORKDIR /
 COPY --from=build /go/src/github.com/takaishi/noguard_sg_checker/noguard_sg_checker /noguard_sg_checker
 
-ENTRYPOINT ["/noguard_sg_checker", "--config", "/config.toml"]
+ENTRYPOINT ["/noguard_sg_checker", "server", "--config", "/config.toml"]
