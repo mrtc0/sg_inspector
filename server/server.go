@@ -10,49 +10,34 @@ import (
 	"github.com/takaishi/noguard_sg_checker/openstack"
 	"github.com/urfave/cli"
 	"log"
-	"os"
 	"strconv"
 )
 
 func Start(c *cli.Context) error {
-
-	log.SetFlags(log.Lshortfile | log.Ldate | log.Ltime)
-	slack_token := os.Getenv("SLACK_TOKEN")
-
-	cfg, err := config.ReadConfigFile(c.String("config"))
+	cfg, err := config.ReadConfig(c.String("config"), c.Bool("dry-run"))
 	if err != nil {
 		return err
 	}
-	cfg.DryRun = c.Bool("dry-run")
-	cfg.SlackChannel = os.Getenv("SLACK_CHANNEL_NAME")
 
-	api := slack.New(slack_token)
+	api := slack.New(cfg.SlackToken)
 	rtm := api.NewRTM()
 	go rtm.ManageConnection()
 
-	osAuthUrl := os.Getenv("OS_AUTH_URL")
-	osUsername := os.Getenv("OS_USERNAME")
-	osPassword := os.Getenv("OS_PASSWORD")
-	osRegionName := os.Getenv("OS_REGION_NAME")
-	osProjectName := os.Getenv("OS_PROJECT_NAME")
-	osCert := os.Getenv("OS_CERT")
-	osKey := os.Getenv("OS_KEY")
-
 	opts := gophercloud.AuthOptions{
-		IdentityEndpoint: osAuthUrl,
-		Username:         osUsername,
-		Password:         osPassword,
+		IdentityEndpoint: cfg.OpenStack.AuthURL,
+		Username:         cfg.OpenStack.Username,
+		Password:         cfg.OpenStack.Password,
 		DomainName:       "Default",
-		TenantName:       osProjectName,
+		TenantName:       cfg.OpenStack.ProjectName,
 	}
 
 	checker := openstack.OpenStackSecurityGroupChecker{
 		Cfg:         cfg,
 		SlackClient: api,
 		AuthOptions: opts,
-		RegionName:  osRegionName,
-		Cert:        osCert,
-		Key:         osKey,
+		RegionName:  cfg.OpenStack.RegionName,
+		Cert:        cfg.OpenStack.Cert,
+		Key:         cfg.OpenStack.Key,
 	}
 
 	server := cron.New()
