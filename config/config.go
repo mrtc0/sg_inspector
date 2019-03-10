@@ -16,6 +16,17 @@ type Config struct {
 	SlackChannel                  string
 	TemporaryAllowdSecurityGroups []string
 	FinishMessage                 string `toml:"finish_message"`
+	OpenStack                     OpenStack
+}
+
+type OpenStack struct {
+	AuthURL     string
+	Username    string
+	Password    string
+	RegionName  string
+	ProjectName string
+	Cert        string
+	Key         string
 }
 
 type Rule struct {

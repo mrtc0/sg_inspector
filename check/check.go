@@ -25,29 +25,29 @@ func Start(c *cli.Context) error {
 	rtm := api.NewRTM()
 	go rtm.ManageConnection()
 
-	osAuthUrl := os.Getenv("OS_AUTH_URL")
-	osUsername := os.Getenv("OS_USERNAME")
-	osPassword := os.Getenv("OS_PASSWORD")
-	osRegionName := os.Getenv("OS_REGION_NAME")
-	osProjectName := os.Getenv("OS_PROJECT_NAME")
-	osCert := os.Getenv("OS_CERT")
-	osKey := os.Getenv("OS_KEY")
+	cfg.OpenStack.AuthURL = os.Getenv("OS_AUTH_URL")
+	cfg.OpenStack.Username = os.Getenv("OS_USERNAME")
+	cfg.OpenStack.Password = os.Getenv("OS_PASSWORD")
+	cfg.OpenStack.RegionName = os.Getenv("OS_REGION_NAME")
+	cfg.OpenStack.ProjectName = os.Getenv("OS_PROJECT_NAME")
+	cfg.OpenStack.Cert = os.Getenv("OS_CERT")
+	cfg.OpenStack.Key = os.Getenv("OS_KEY")
 
 	opts := gophercloud.AuthOptions{
-		IdentityEndpoint: osAuthUrl,
-		Username:         osUsername,
-		Password:         osPassword,
+		IdentityEndpoint: cfg.OpenStack.AuthURL,
+		Username:         cfg.OpenStack.Username,
+		Password:         cfg.OpenStack.Password,
 		DomainName:       "Default",
-		TenantName:       osProjectName,
+		TenantName:       cfg.OpenStack.ProjectName,
 	}
 
 	checker := openstack.OpenStackSecurityGroupChecker{
 		Cfg:         cfg,
 		SlackClient: api,
 		AuthOptions: opts,
-		RegionName:  osRegionName,
-		Cert:        osCert,
-		Key:         osKey,
+		RegionName:  cfg.OpenStack.RegionName,
+		Cert:        cfg.OpenStack.Cert,
+		Key:         cfg.OpenStack.Key,
 	}
 
 	err = checker.CheckSecurityGroups()
