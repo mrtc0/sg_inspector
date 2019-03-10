@@ -95,9 +95,11 @@ func (checker *OpenStackSecurityGroupChecker) CheckSecurityGroups() error {
 		}
 	}
 	if existNoguardSG {
-		err := checker.postWarning(attachments)
-		if err != nil {
-			return err
+		if !checker.Cfg.DryRun {
+			err := checker.postWarning(attachments)
+			if err != nil {
+				return err
+			}
 		}
 
 		return errors.New("Found no guard security group")
