@@ -2,6 +2,7 @@ package config
 
 import (
 	"github.com/BurntSushi/toml"
+	"os"
 	"path/filepath"
 )
 
@@ -68,4 +69,24 @@ func ReadConfigFile(cfgPath string) (Config, error) {
 		}
 	}
 	return cfg, err
+}
+
+func ReadConfig(cfgPath string, dryRun bool) (Config, error) {
+	cfg, err := ReadConfigFile(cfgPath)
+	if err != nil {
+		return cfg, err
+	}
+
+	cfg.DryRun = dryRun
+	cfg.SlackChannel = os.Getenv("SLACK_CHANNEL_NAME")
+
+	cfg.OpenStack.AuthURL = os.Getenv("OS_AUTH_URL")
+	cfg.OpenStack.Username = os.Getenv("OS_USERNAME")
+	cfg.OpenStack.Password = os.Getenv("OS_PASSWORD")
+	cfg.OpenStack.RegionName = os.Getenv("OS_REGION_NAME")
+	cfg.OpenStack.ProjectName = os.Getenv("OS_PROJECT_NAME")
+	cfg.OpenStack.Cert = os.Getenv("OS_CERT")
+	cfg.OpenStack.Key = os.Getenv("OS_KEY")
+
+	return cfg, nil
 }

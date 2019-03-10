@@ -14,24 +14,14 @@ func Start(c *cli.Context) error {
 
 	slack_token := os.Getenv("SLACK_TOKEN")
 
-	cfg, err := config.ReadConfigFile(c.String("config"))
+	cfg, err := config.ReadConfig(c.String("config"), c.Bool("dry-run"))
 	if err != nil {
 		return err
 	}
-	cfg.DryRun = c.Bool("dry-run")
-	cfg.SlackChannel = os.Getenv("SLACK_CHANNEL_NAME")
 
 	api := slack.New(slack_token)
 	rtm := api.NewRTM()
 	go rtm.ManageConnection()
-
-	cfg.OpenStack.AuthURL = os.Getenv("OS_AUTH_URL")
-	cfg.OpenStack.Username = os.Getenv("OS_USERNAME")
-	cfg.OpenStack.Password = os.Getenv("OS_PASSWORD")
-	cfg.OpenStack.RegionName = os.Getenv("OS_REGION_NAME")
-	cfg.OpenStack.ProjectName = os.Getenv("OS_PROJECT_NAME")
-	cfg.OpenStack.Cert = os.Getenv("OS_CERT")
-	cfg.OpenStack.Key = os.Getenv("OS_KEY")
 
 	opts := gophercloud.AuthOptions{
 		IdentityEndpoint: cfg.OpenStack.AuthURL,
