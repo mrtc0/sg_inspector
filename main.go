@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/takaishi/noguard_sg_checker/check"
+	"github.com/takaishi/noguard_sg_checker/config"
 	"github.com/takaishi/noguard_sg_checker/server"
 	"github.com/urfave/cli"
 	"log"
@@ -12,6 +13,7 @@ var version string
 
 func main() {
 	app := cli.NewApp()
+	app.Version = config.Version
 	app.Commands = []cli.Command{
 		{
 			Name:  "server",

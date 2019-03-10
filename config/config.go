@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 )
 
+var Version string
+
 type Config struct {
 	DryRun                        bool
 	Rules                         []Rule
