@@ -10,6 +10,7 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/rules"
 	"github.com/gophercloud/gophercloud/pagination"
 	"github.com/nlopes/slack"
+	"github.com/pkg/errors"
 	"github.com/takaishi/noguard_sg_checker/config"
 	"io/ioutil"
 	"log"
@@ -94,7 +95,13 @@ func (checker *OpenStackSecurityGroupChecker) CheckSecurityGroups() error {
 		}
 	}
 	if existNoguardSG {
-		return checker.postWarning(attachments)
+		err := checker.postWarning(attachments)
+		if err != nil {
+			return err
+		}
+
+		return errors.New("Found no guard security group")
+
 	} else {
 		log.Printf("[INFO] 一時的に全解放しているセキュリティグループはありませんでした")
 		return nil

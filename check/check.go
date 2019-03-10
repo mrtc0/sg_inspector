@@ -3,10 +3,10 @@ package check
 import (
 	"github.com/gophercloud/gophercloud"
 	"github.com/nlopes/slack"
+	"github.com/pkg/errors"
 	"github.com/takaishi/noguard_sg_checker/config"
 	"github.com/takaishi/noguard_sg_checker/openstack"
 	"github.com/urfave/cli"
-	"log"
 )
 
 func Start(c *cli.Context) error {
@@ -36,7 +36,7 @@ func Start(c *cli.Context) error {
 
 	err = checker.CheckSecurityGroups()
 	if err != nil {
-		log.Printf("[ERROR] %+v\n", err)
+		return errors.Wrap(err, "Failed to check")
 	}
 
 	return nil
