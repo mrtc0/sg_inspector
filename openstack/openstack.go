@@ -35,12 +35,12 @@ func (checker *OpenStackSecurityGroupChecker) CheckSecurityGroups() error {
 	eo := gophercloud.EndpointOpts{Region: checker.RegionName}
 	client, err := checker.Authenticate(checker.AuthOptions, checker.Cert, checker.Key)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "Failed to authenticate OpenStack API")
 	}
 
 	ps, err := checker.FetchProjects(client, eo)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "Failed to fetch projects")
 	}
 
 	for i, rule := range checker.Cfg.Rules {
@@ -53,7 +53,7 @@ func (checker *OpenStackSecurityGroupChecker) CheckSecurityGroups() error {
 
 	securityGroups, err := checker.FetchSecurityGroups(client, eo)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "Failed to security groups")
 	}
 	for _, sg := range securityGroups {
 		for _, rule := range sg.Rules {
@@ -68,7 +68,7 @@ func (checker *OpenStackSecurityGroupChecker) CheckSecurityGroups() error {
 
 					projectName, err := getProjectNameFromID(sg.TenantID, ps)
 					if err != nil {
-						return err
+						return errors.Wrapf(err, "Failed to get project name from id (%s)", sg.TenantID)
 					}
 					fmt.Printf("[[rules]]\n")
 					fmt.Printf("tenant = \"%s\"\n", projectName)
@@ -98,7 +98,7 @@ func (checker *OpenStackSecurityGroupChecker) CheckSecurityGroups() error {
 		if !checker.Cfg.DryRun {
 			err := checker.postWarning(attachments)
 			if err != nil {
-				return err
+				return errors.Wrapf(err, "Failed to post warning")
 			}
 		}
 
@@ -126,7 +126,7 @@ func (checker *OpenStackSecurityGroupChecker) postWarning(attachments []slack.At
 	}
 	err := postMessage(checker.SlackClient, checker.Cfg.SlackChannel, "全解放しているセキュリティグループがあるように見えるぞ！大丈夫？？？", params)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "Failed to post message")
 	}
 
 	for _, item := range attachments {
@@ -137,12 +137,12 @@ func (checker *OpenStackSecurityGroupChecker) postWarning(attachments []slack.At
 		}
 		err = postMessage(checker.SlackClient, checker.Cfg.SlackChannel, "", params)
 		if err != nil {
-			return err
+			return errors.Wrapf(err, "Failed to post message")
 		}
 	}
 	err = postMessage(checker.SlackClient, checker.Cfg.SlackChannel, checker.Cfg.FinishMessage, params)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "Failed to post message")
 	}
 
 	return nil
