@@ -31,15 +31,10 @@ type OpenStackSecurityGroupChecker struct {
 	Key         string
 	Attachments []slack.Attachment
 	Projects    []projects.Project
-	r           *rego.Rego
 }
 
-func (checker *OpenStackSecurityGroupChecker) CheckSecurityGroups() error {
+func (checker *OpenStackSecurityGroupChecker) CheckSecurityGroups() (err error) {
 	log.Printf("%+v\n", checker.Cfg.TemporaryAllowdSecurityGroups)
-	checker.r = rego.New(
-		rego.Query("x = data.example.danger[_]"),
-		rego.Load([]string{"./example.rego", "./data.yaml"}, nil),
-	)
 
 	existNoguardSG := false
 	eo := gophercloud.EndpointOpts{Region: checker.RegionName}
@@ -74,19 +69,11 @@ func (checker *OpenStackSecurityGroupChecker) CheckSecurityGroups() error {
 		if isFullOpen {
 			existNoguardSG = true
 		}
-
-		match, err := checker.MatchPolicy(sg)
-		if err != nil {
-			return err
-		}
-		if match {
-			existNoguardSG = true
-		}
 	}
 
 	if existNoguardSG {
 		if !checker.Cfg.DryRun {
-			err := checker.postWarning(checker.Attachments)
+			err := checker.postWarning(checker.Attachments, "", "")
 			if err != nil {
 				return errors.Wrapf(err, "Failed to post warning")
 			}
@@ -96,8 +83,47 @@ func (checker *OpenStackSecurityGroupChecker) CheckSecurityGroups() error {
 
 	} else {
 		log.Printf("[INFO] 一時的に全解放しているセキュリティグループはありませんでした")
-		return nil
 	}
+
+	checker.Attachments = []slack.Attachment{}
+
+	for _, policy := range checker.Cfg.Policies {
+		r := rego.New(
+			rego.Query("x = data.example.danger[_]"),
+			rego.Load([]string{policy.Policy, policy.Data}, nil),
+		)
+
+		query, err := r.PrepareForEval(context.Background())
+		if err != nil {
+			log.Fatal(err)
+		}
+		existsSGMatchedPolicy := false
+		for _, sg := range securityGroups {
+			match, err := checker.MatchPolicy(query, sg)
+			if err != nil {
+				return err
+			}
+			if match {
+				existsSGMatchedPolicy = true
+			}
+		}
+
+		if existsSGMatchedPolicy {
+			if !checker.Cfg.DryRun {
+				err := checker.postWarning(checker.Attachments, policy.PrefixMessage, policy.SuffixMessage)
+				if err != nil {
+					return errors.Wrapf(err, "Failed to post warning")
+				}
+			}
+
+			return errors.New("Found no guard security group")
+
+		} else {
+			log.Printf("[INFO] 一時的に全解放しているセキュリティグループはありませんでした")
+			return nil
+		}
+	}
+	return nil
 }
 
 func contain(s []string, e string) bool {
@@ -109,12 +135,12 @@ func contain(s []string, e string) bool {
 	return false
 }
 
-func (checker *OpenStackSecurityGroupChecker) postWarning(attachments []slack.Attachment) error {
+func (checker *OpenStackSecurityGroupChecker) postWarning(attachments []slack.Attachment, prefix string, suffix string) error {
 	params := slack.PostMessageParameters{
 		Username:  checker.Cfg.Username,
 		IconEmoji: checker.Cfg.IconEmoji,
 	}
-	err := postMessage(checker.SlackClient, checker.Cfg.SlackChannel, "全解放しているセキュリティグループがあるように見えるぞ！大丈夫？？？", params)
+	err := postMessage(checker.SlackClient, checker.Cfg.SlackChannel, prefix, params)
 	if err != nil {
 		return errors.Wrapf(err, "Failed to post message")
 	}
@@ -130,7 +156,7 @@ func (checker *OpenStackSecurityGroupChecker) postWarning(attachments []slack.At
 			return errors.Wrapf(err, "Failed to post message")
 		}
 	}
-	err = postMessage(checker.SlackClient, checker.Cfg.SlackChannel, checker.Cfg.FinishMessage, params)
+	err = postMessage(checker.SlackClient, checker.Cfg.SlackChannel, suffix, params)
 	if err != nil {
 		return errors.Wrapf(err, "Failed to post message")
 	}
@@ -294,7 +320,8 @@ func (checker *OpenStackSecurityGroupChecker) IsFullOpen(sg groups.SecGroup) (bo
 	return isFullOpen, nil
 }
 
-func (checker *OpenStackSecurityGroupChecker) MatchPolicy(sg groups.SecGroup) (bool, error) {
+func (checker *OpenStackSecurityGroupChecker) MatchPolicy(query rego.PreparedEvalQuery, sg groups.SecGroup) (bool, error) {
+	match := false
 	ctx := context.Background()
 	var input interface{}
 	var s struct {
@@ -306,53 +333,51 @@ func (checker *OpenStackSecurityGroupChecker) MatchPolicy(sg groups.SecGroup) (b
 	jsonData := []byte{}
 	jsonData, err := json.Marshal(&s)
 	if err != nil {
-		return false, err
+		return match, err
 	}
 	err = json.Unmarshal(jsonData, &input)
 	if err != nil {
-		log.Fatal(err)
-	}
-
-	query, err := checker.r.PrepareForEval(ctx)
-	if err != nil {
-		log.Fatal(err)
+		return match, err
 	}
 
 	rs, err := query.Eval(ctx, rego.EvalInput(input))
 	if err != nil {
-		log.Fatal(err)
+		return match, err
 	}
 	if len(rs) > 0 {
+		match = true
 		projectName, err := getProjectNameFromID(sg.TenantID, checker.Projects)
 		if err != nil {
-			return true, errors.Wrapf(err, "Failed to get project name from id (%s)", sg.TenantID)
+			return match, err
 		}
 		projectName, err = getProjectNameFromID(sg.TenantID, checker.Projects)
 		if err != nil {
-			return true, errors.Wrapf(err, "Failed to get project name from id (%s)", sg.TenantID)
+			return match, err
 		}
 		fmt.Printf("[[rules]]\n")
 		fmt.Printf("tenant = \"%s\"\n", projectName)
 		fmt.Printf("sg = \"%s\"\n", sg.Name)
 		fmt.Printf("created = \"%s\"\n", sg.CreatedAt.Local())
 		fields := []slack.AttachmentField{
-			{Title: "Tenant", Value: projectName},
-			{Title: "ID", Value: sg.ID},
 			{Title: "Name", Value: sg.Name},
+			{Title: "Tenant", Value: projectName, Short: true},
+			{Title: "ID", Value: sg.ID, Short: true},
+			{Title: "Created", Value: sg.CreatedAt.Local().String()},
 		}
+		value := ""
 		for _, rule := range sg.Rules {
-			field := slack.AttachmentField{
-				Title: "Rule",
-				Value: fmt.Sprintf("%s, %d-%d", rule.RemoteIPPrefix, rule.PortRangeMin, rule.PortRangeMax),
-			}
-			fields = append(fields, field)
+			value += fmt.Sprintf("%s, IP Range: %s, Port Range: %s\n", rule.Direction, rule.RemoteIPPrefix, fmt.Sprintf("%d-%d", rule.PortRangeMin, rule.PortRangeMax))
 		}
+		fields = append(fields, slack.AttachmentField{
+			Title: "Rules",
+			Value: value,
+		})
 		attachment := slack.Attachment{
 			Color:  "#ff6347",
 			Fields: fields,
 		}
 		checker.Attachments = append(checker.Attachments, attachment)
-		return true, nil
+		return true, err
 	}
-	return false, nil
+	return false, err
 }
