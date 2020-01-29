@@ -67,7 +67,6 @@ func (checker *OpenStackSecurityGroupChecker) CheckSecurityGroups() error {
 	for _, sg := range securityGroups {
 		for _, rule := range sg.Rules {
 			if rule.RemoteIPPrefix == "0.0.0.0/0" && rule.Protocol == "tcp" && rule.Direction == "ingress" {
-				ports := []string{}
 				if !matchAllowdRule(checker.Cfg.Rules, sg, rule) {
 					if contain(checker.Cfg.TemporaryAllowdSecurityGroups, sg.ID) {
 						log.Printf("許可済みのSGなのでSlackに警告メッセージは流さない")
@@ -82,11 +81,6 @@ func (checker *OpenStackSecurityGroupChecker) CheckSecurityGroups() error {
 					fmt.Printf("[[rules]]\n")
 					fmt.Printf("tenant = \"%s\"\n", projectName)
 					fmt.Printf("sg = \"%s\"\n", sg.Name)
-					if rule.PortRangeMin == rule.PortRangeMax {
-						ports = append(ports, fmt.Sprintf("\"%d\"", rule.PortRangeMin))
-					} else {
-						ports = append(ports, fmt.Sprintf("\"%d-%d\"", rule.PortRangeMin, rule.PortRangeMax))
-					}
 
 					fields := []slack.AttachmentField{
 						{Title: "Tenant", Value: projectName},
