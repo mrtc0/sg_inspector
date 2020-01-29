@@ -29,6 +29,7 @@ type OpenStackSecurityGroupChecker struct {
 	RegionName  string
 	Cert        string
 	Key         string
+	Attachments []slack.Attachment
 }
 
 func (checker *OpenStackSecurityGroupChecker) CheckSecurityGroups() error {
@@ -40,7 +41,6 @@ func (checker *OpenStackSecurityGroupChecker) CheckSecurityGroups() error {
 	)
 
 	existNoguardSG := false
-	attachments := []slack.Attachment{}
 	eo := gophercloud.EndpointOpts{Region: checker.RegionName}
 	client, err := checker.Authenticate(checker.AuthOptions, checker.Cert, checker.Key)
 	if err != nil {
@@ -98,7 +98,7 @@ func (checker *OpenStackSecurityGroupChecker) CheckSecurityGroups() error {
 						Color:  "#ff6347",
 						Fields: fields,
 					}
-					attachments = append(attachments, attachment)
+					checker.Attachments = append(checker.Attachments, attachment)
 				}
 			}
 		}
@@ -143,7 +143,7 @@ func (checker *OpenStackSecurityGroupChecker) CheckSecurityGroups() error {
 	}
 	if existNoguardSG {
 		if !checker.Cfg.DryRun {
-			err := checker.postWarning(attachments)
+			err := checker.postWarning(checker.Attachments)
 			if err != nil {
 				return errors.Wrapf(err, "Failed to post warning")
 			}
