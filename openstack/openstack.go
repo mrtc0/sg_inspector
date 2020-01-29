@@ -14,7 +14,7 @@ import (
 	"github.com/nlopes/slack"
 	"github.com/open-policy-agent/opa/rego"
 	"github.com/pkg/errors"
-	"github.com/takaishi/noguard_sg_checker/config"
+	"github.com/takaishi/sg_inspector/config"
 	"io/ioutil"
 	"log"
 	"net/http"

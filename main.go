@@ -3,9 +3,9 @@ package main
 import (
 	"github.com/pkg/profile"
 	"github.com/sirupsen/logrus"
-	"github.com/takaishi/noguard_sg_checker/check"
-	"github.com/takaishi/noguard_sg_checker/config"
-	"github.com/takaishi/noguard_sg_checker/server"
+	"github.com/takaishi/sg_inspector/check"
+	"github.com/takaishi/sg_inspector/config"
+	"github.com/takaishi/sg_inspector/server"
 	"github.com/urfave/cli"
 	"log"
 	"os"
