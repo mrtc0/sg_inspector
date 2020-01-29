@@ -56,7 +56,7 @@ func (checker *OpenStackSecurityGroupChecker) CheckSecurityGroups() (err error) 
 		}
 	}
 
-	securityGroups, err := checker.FetchSecurityGroups(client, eo)
+	securityGroups, err := checker.fetchSecurityGroups(client, eo)
 	if err != nil {
 		return errors.Wrapf(err, "Failed to security groups")
 	}
@@ -263,12 +263,10 @@ func (checker *OpenStackSecurityGroupChecker) FetchProjects(client *gophercloud.
 	return ps, nil
 }
 
-func (checker *OpenStackSecurityGroupChecker) FetchSecurityGroups(client *gophercloud.ProviderClient, eo gophercloud.EndpointOpts) ([]groups.SecGroup, error) {
-	sgs := []groups.SecGroup{}
-
+func (checker *OpenStackSecurityGroupChecker) fetchSecurityGroups(client *gophercloud.ProviderClient, eo gophercloud.EndpointOpts) (secGroups []groups.SecGroup, err error) {
 	networkClient, err := openstack.NewNetworkV2(client, eo)
 	if err != nil {
-		return nil, err
+		return
 	}
 
 	groups.List(networkClient, groups.ListOpts{}).EachPage(func(page pagination.Page) (bool, error) {
@@ -277,11 +275,11 @@ func (checker *OpenStackSecurityGroupChecker) FetchSecurityGroups(client *gopher
 			return false, err
 		}
 		for _, sg := range securityGroups {
-			sgs = append(sgs, sg)
+			secGroups = append(secGroups, sg)
 		}
 		return true, nil
 	})
-	return sgs, nil
+	return
 }
 
 func (checker *OpenStackSecurityGroupChecker) IsFullOpen(sg groups.SecGroup) (bool, error) {
