@@ -3,9 +3,6 @@ package main
 import (
 	"github.com/pkg/profile"
 	"github.com/sirupsen/logrus"
-	"github.com/takaishi/sg_inspector/check"
-	"github.com/takaishi/sg_inspector/config"
-	"github.com/takaishi/sg_inspector/server"
 	"github.com/urfave/cli"
 	"log"
 	"os"
@@ -27,7 +24,7 @@ func main() {
 	log.SetFlags(0)
 
 	app := cli.NewApp()
-	app.Version = config.Version
+	app.Version = Version
 	app.Commands = []cli.Command{
 		{
 			Name:  "server",
@@ -44,7 +41,7 @@ func main() {
 				},
 			},
 			Action: func(c *cli.Context) error {
-				return server.Start(c)
+				return StartServer(c)
 			},
 		},
 		{
@@ -62,7 +59,7 @@ func main() {
 				},
 			},
 			Action: func(c *cli.Context) error {
-				return check.Start(c)
+				return StartCheck(c)
 			},
 		},
 	}

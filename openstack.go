@@ -1,4 +1,4 @@
-package openstack
+package main
 
 import (
 	"context"
@@ -14,7 +14,6 @@ import (
 	"github.com/nlopes/slack"
 	"github.com/open-policy-agent/opa/rego"
 	"github.com/pkg/errors"
-	"github.com/takaishi/sg_inspector/config"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -23,7 +22,7 @@ import (
 )
 
 type OpenStackSecurityGroupChecker struct {
-	Cfg         config.Config
+	Cfg         Config
 	SlackClient *slack.Client
 	AuthOptions gophercloud.AuthOptions
 	RegionName  string
@@ -181,7 +180,7 @@ func getProjectNameFromID(id string, ps []projects.Project) (string, error) {
 	return "", fmt.Errorf("Not found project: %s", id)
 }
 
-func matchAllowdRule(allowdRules []config.Rule, sg groups.SecGroup, rule rules.SecGroupRule) bool {
+func matchAllowdRule(allowdRules []Rule, sg groups.SecGroup, rule rules.SecGroupRule) bool {
 	for _, allowdRule := range allowdRules {
 		if allowdRule.TenantID == sg.TenantID && allowdRule.SG == sg.Name {
 			r := regexp.MustCompile(`(\d*)-(\d*)`)

@@ -1,4 +1,4 @@
-package server
+package main
 
 import (
 	"fmt"
@@ -6,15 +6,13 @@ import (
 	"github.com/nlopes/slack"
 	"github.com/pkg/errors"
 	"github.com/robfig/cron"
-	"github.com/takaishi/sg_inspector/config"
-	"github.com/takaishi/sg_inspector/openstack"
 	"github.com/urfave/cli"
 	"log"
 	"strconv"
 )
 
-func Start(c *cli.Context) error {
-	cfg, err := config.ReadConfig(c.String("config"), c.Bool("dry-run"))
+func StartServer(c *cli.Context) error {
+	cfg, err := ReadConfig(c.String("config"), c.Bool("dry-run"))
 	if err != nil {
 		return err
 	}
@@ -31,7 +29,7 @@ func Start(c *cli.Context) error {
 		TenantName:       cfg.OpenStack.ProjectName,
 	}
 
-	checker := openstack.OpenStackSecurityGroupChecker{
+	checker := OpenStackSecurityGroupChecker{
 		Cfg:         cfg,
 		SlackClient: api,
 		AuthOptions: opts,
