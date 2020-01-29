@@ -33,17 +33,17 @@ type OpenStackSecurityGroupChecker struct {
 	Projects    []projects.Project
 }
 
-func (checker *OpenStackSecurityGroupChecker) CheckSecurityGroups() (err error) {
+func (checker *OpenStackSecurityGroupChecker) Run() (err error) {
 	log.Printf("%+v\n", checker.Cfg.TemporaryAllowdSecurityGroups)
 
 	existNoguardSG := false
 	eo := gophercloud.EndpointOpts{Region: checker.RegionName}
-	client, err := checker.Authenticate(checker.AuthOptions, checker.Cert, checker.Key)
+	client, err := checker.authenticate(checker.AuthOptions, checker.Cert, checker.Key)
 	if err != nil {
 		return errors.Wrapf(err, "Failed to authenticate OpenStack API")
 	}
 
-	checker.Projects, err = checker.FetchProjects(client, eo)
+	checker.Projects, err = checker.fetchProjects(client, eo)
 	if err != nil {
 		return errors.Wrapf(err, "Failed to fetch projects")
 	}
@@ -62,7 +62,7 @@ func (checker *OpenStackSecurityGroupChecker) CheckSecurityGroups() (err error) 
 	}
 
 	for _, sg := range securityGroups {
-		isFullOpen, err := checker.IsFullOpen(sg)
+		isFullOpen, err := checker.isFullOpen(sg)
 		if err != nil {
 			return err
 		}
@@ -99,7 +99,7 @@ func (checker *OpenStackSecurityGroupChecker) CheckSecurityGroups() (err error) 
 		}
 		existsSGMatchedPolicy := false
 		for _, sg := range securityGroups {
-			match, err := checker.MatchPolicy(query, sg)
+			match, err := checker.matchPolicy(query, sg)
 			if err != nil {
 				return err
 			}
@@ -209,7 +209,7 @@ func contains(slice []string, item string) bool {
 	}
 	return false
 }
-func (checker *OpenStackSecurityGroupChecker) Authenticate(opts gophercloud.AuthOptions, osCert string, osKey string) (*gophercloud.ProviderClient, error) {
+func (checker *OpenStackSecurityGroupChecker) authenticate(opts gophercloud.AuthOptions, osCert string, osKey string) (*gophercloud.ProviderClient, error) {
 	client, err := openstack.NewClient(opts.IdentityEndpoint)
 	if err != nil {
 		return nil, err
@@ -242,28 +242,26 @@ func (checker *OpenStackSecurityGroupChecker) Authenticate(opts gophercloud.Auth
 	return client, nil
 }
 
-func (checker *OpenStackSecurityGroupChecker) FetchProjects(client *gophercloud.ProviderClient, eo gophercloud.EndpointOpts) ([]projects.Project, error) {
-	ps := []projects.Project{}
+func (checker *OpenStackSecurityGroupChecker) fetchProjects(client *gophercloud.ProviderClient, eo gophercloud.EndpointOpts) (results []projects.Project, err error) {
 	identityClient, err := openstack.NewIdentityV3(client, eo)
 	if err != nil {
-		return nil, err
+		return
 	}
+
 	projects.List(identityClient, nil).EachPage(func(page pagination.Page) (bool, error) {
 		extracted, err := projects.ExtractProjects(page)
 		if err != nil {
 			return false, err
 		}
 		for _, project := range extracted {
-			ps = append(ps, project)
+			results = append(results, project)
 		}
-
 		return true, nil
 	})
-
-	return ps, nil
+	return
 }
 
-func (checker *OpenStackSecurityGroupChecker) fetchSecurityGroups(client *gophercloud.ProviderClient, eo gophercloud.EndpointOpts) (secGroups []groups.SecGroup, err error) {
+func (checker *OpenStackSecurityGroupChecker) fetchSecurityGroups(client *gophercloud.ProviderClient, eo gophercloud.EndpointOpts) (results []groups.SecGroup, err error) {
 	networkClient, err := openstack.NewNetworkV2(client, eo)
 	if err != nil {
 		return
@@ -275,14 +273,14 @@ func (checker *OpenStackSecurityGroupChecker) fetchSecurityGroups(client *gopher
 			return false, err
 		}
 		for _, sg := range securityGroups {
-			secGroups = append(secGroups, sg)
+			results = append(results, sg)
 		}
 		return true, nil
 	})
 	return
 }
 
-func (checker *OpenStackSecurityGroupChecker) IsFullOpen(sg groups.SecGroup) (bool, error) {
+func (checker *OpenStackSecurityGroupChecker) isFullOpen(sg groups.SecGroup) (bool, error) {
 	isFullOpen := false
 	for _, rule := range sg.Rules {
 		if rule.RemoteIPPrefix == "0.0.0.0/0" && rule.Protocol == "tcp" && rule.Direction == "ingress" {
@@ -318,7 +316,7 @@ func (checker *OpenStackSecurityGroupChecker) IsFullOpen(sg groups.SecGroup) (bo
 	return isFullOpen, nil
 }
 
-func (checker *OpenStackSecurityGroupChecker) MatchPolicy(query rego.PreparedEvalQuery, sg groups.SecGroup) (bool, error) {
+func (checker *OpenStackSecurityGroupChecker) matchPolicy(query rego.PreparedEvalQuery, sg groups.SecGroup) (bool, error) {
 	match := false
 	ctx := context.Background()
 	var input interface{}

@@ -34,7 +34,7 @@ func Start(c *cli.Context) error {
 		Key:         cfg.OpenStack.Key,
 	}
 
-	err = checker.CheckSecurityGroups()
+	err = checker.Run()
 	if err != nil {
 		return errors.Wrap(err, "Failed to check")
 	}
