@@ -1,7 +1,9 @@
 package openstack
 
 import (
+	"context"
 	"crypto/tls"
+	"encoding/json"
 	"fmt"
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
@@ -10,6 +12,7 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/rules"
 	"github.com/gophercloud/gophercloud/pagination"
 	"github.com/nlopes/slack"
+	"github.com/open-policy-agent/opa/rego"
 	"github.com/pkg/errors"
 	"github.com/takaishi/noguard_sg_checker/config"
 	"io/ioutil"
@@ -30,6 +33,12 @@ type OpenStackSecurityGroupChecker struct {
 
 func (checker *OpenStackSecurityGroupChecker) CheckSecurityGroups() error {
 	log.Printf("%+v\n", checker.Cfg.TemporaryAllowdSecurityGroups)
+	ctx := context.Background()
+	r := rego.New(
+		rego.Query("x = data.example.danger[_]"),
+		rego.Load([]string{"./example.rego", "./data.yaml"}, nil),
+	)
+
 	existNoguardSG := false
 	attachments := []slack.Attachment{}
 	eo := gophercloud.EndpointOpts{Region: checker.RegionName}
@@ -92,6 +101,44 @@ func (checker *OpenStackSecurityGroupChecker) CheckSecurityGroups() error {
 					attachments = append(attachments, attachment)
 				}
 			}
+		}
+
+		var s struct {
+			groups.SecGroup
+			CreatedAt int64 `json:"created_at"`
+		}
+		s.SecGroup = sg
+		s.CreatedAt = sg.CreatedAt.UnixNano()
+		jsonData := []byte{}
+		jsonData, err := json.Marshal(&s)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		var input interface{}
+		err = json.Unmarshal(jsonData, &input)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		query, err := r.PrepareForEval(ctx)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		rs, err := query.Eval(ctx, rego.EvalInput(input))
+		if err != nil {
+			log.Fatal(err)
+		}
+		if len(rs) > 0 {
+			projectName, err := getProjectNameFromID(sg.TenantID, ps)
+			if err != nil {
+				return errors.Wrapf(err, "Failed to get project name from id (%s)", sg.TenantID)
+			}
+			fmt.Printf("[[rules]]\n")
+			fmt.Printf("tenant = \"%s\"\n", projectName)
+			fmt.Printf("sg = \"%s\"\n", sg.Name)
+			fmt.Printf("created = \"%s\"\n", sg.CreatedAt.Local())
 		}
 	}
 	if existNoguardSG {
