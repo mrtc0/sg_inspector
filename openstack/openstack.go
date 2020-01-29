@@ -31,12 +31,12 @@ type OpenStackSecurityGroupChecker struct {
 	Key         string
 	Attachments []slack.Attachment
 	Projects    []projects.Project
+	r           *rego.Rego
 }
 
 func (checker *OpenStackSecurityGroupChecker) CheckSecurityGroups() error {
 	log.Printf("%+v\n", checker.Cfg.TemporaryAllowdSecurityGroups)
-	ctx := context.Background()
-	r := rego.New(
+	checker.r = rego.New(
 		rego.Query("x = data.example.danger[_]"),
 		rego.Load([]string{"./example.rego", "./data.yaml"}, nil),
 	)
@@ -65,6 +65,7 @@ func (checker *OpenStackSecurityGroupChecker) CheckSecurityGroups() error {
 	if err != nil {
 		return errors.Wrapf(err, "Failed to security groups")
 	}
+
 	for _, sg := range securityGroups {
 		isFullOpen, err := checker.IsFullOpen(sg)
 		if err != nil {
@@ -74,44 +75,15 @@ func (checker *OpenStackSecurityGroupChecker) CheckSecurityGroups() error {
 			existNoguardSG = true
 		}
 
-		var s struct {
-			groups.SecGroup
-			CreatedAt int64 `json:"created_at"`
-		}
-		s.SecGroup = sg
-		s.CreatedAt = sg.CreatedAt.UnixNano()
-		jsonData := []byte{}
-		jsonData, err = json.Marshal(&s)
+		match, err := checker.MatchPolicy(sg)
 		if err != nil {
-			log.Fatal(err)
+			return err
 		}
-
-		var input interface{}
-		err = json.Unmarshal(jsonData, &input)
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		query, err := r.PrepareForEval(ctx)
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		rs, err := query.Eval(ctx, rego.EvalInput(input))
-		if err != nil {
-			log.Fatal(err)
-		}
-		if len(rs) > 0 {
-			projectName, err := getProjectNameFromID(sg.TenantID, checker.Projects)
-			if err != nil {
-				return errors.Wrapf(err, "Failed to get project name from id (%s)", sg.TenantID)
-			}
-			fmt.Printf("[[rules]]\n")
-			fmt.Printf("tenant = \"%s\"\n", projectName)
-			fmt.Printf("sg = \"%s\"\n", sg.Name)
-			fmt.Printf("created = \"%s\"\n", sg.CreatedAt.Local())
+		if match {
+			existNoguardSG = true
 		}
 	}
+
 	if existNoguardSG {
 		if !checker.Cfg.DryRun {
 			err := checker.postWarning(checker.Attachments)
@@ -320,4 +292,67 @@ func (checker *OpenStackSecurityGroupChecker) IsFullOpen(sg groups.SecGroup) (bo
 	}
 
 	return isFullOpen, nil
+}
+
+func (checker *OpenStackSecurityGroupChecker) MatchPolicy(sg groups.SecGroup) (bool, error) {
+	ctx := context.Background()
+	var input interface{}
+	var s struct {
+		groups.SecGroup
+		CreatedAt int64 `json:"created_at"`
+	}
+	s.SecGroup = sg
+	s.CreatedAt = sg.CreatedAt.UnixNano()
+	jsonData := []byte{}
+	jsonData, err := json.Marshal(&s)
+	if err != nil {
+		return false, err
+	}
+	err = json.Unmarshal(jsonData, &input)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	query, err := checker.r.PrepareForEval(ctx)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	rs, err := query.Eval(ctx, rego.EvalInput(input))
+	if err != nil {
+		log.Fatal(err)
+	}
+	if len(rs) > 0 {
+		projectName, err := getProjectNameFromID(sg.TenantID, checker.Projects)
+		if err != nil {
+			return true, errors.Wrapf(err, "Failed to get project name from id (%s)", sg.TenantID)
+		}
+		projectName, err = getProjectNameFromID(sg.TenantID, checker.Projects)
+		if err != nil {
+			return true, errors.Wrapf(err, "Failed to get project name from id (%s)", sg.TenantID)
+		}
+		fmt.Printf("[[rules]]\n")
+		fmt.Printf("tenant = \"%s\"\n", projectName)
+		fmt.Printf("sg = \"%s\"\n", sg.Name)
+		fmt.Printf("created = \"%s\"\n", sg.CreatedAt.Local())
+		fields := []slack.AttachmentField{
+			{Title: "Tenant", Value: projectName},
+			{Title: "ID", Value: sg.ID},
+			{Title: "Name", Value: sg.Name},
+		}
+		for _, rule := range sg.Rules {
+			field := slack.AttachmentField{
+				Title: "Rule",
+				Value: fmt.Sprintf("%s, %d-%d", rule.RemoteIPPrefix, rule.PortRangeMin, rule.PortRangeMax),
+			}
+			fields = append(fields, field)
+		}
+		attachment := slack.Attachment{
+			Color:  "#ff6347",
+			Fields: fields,
+		}
+		checker.Attachments = append(checker.Attachments, attachment)
+		return true, nil
+	}
+	return false, nil
 }
