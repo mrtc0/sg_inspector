@@ -81,7 +81,7 @@ func (checker *OpenStackSecurityGroupChecker) CheckSecurityGroups() error {
 		s.SecGroup = sg
 		s.CreatedAt = sg.CreatedAt.UnixNano()
 		jsonData := []byte{}
-		jsonData, err := json.Marshal(&s)
+		jsonData, err = json.Marshal(&s)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -102,7 +102,7 @@ func (checker *OpenStackSecurityGroupChecker) CheckSecurityGroups() error {
 			log.Fatal(err)
 		}
 		if len(rs) > 0 {
-			projectName, err := getProjectNameFromID(sg.TenantID, ps)
+			projectName, err := getProjectNameFromID(sg.TenantID, checker.Projects)
 			if err != nil {
 				return errors.Wrapf(err, "Failed to get project name from id (%s)", sg.TenantID)
 			}
@@ -296,7 +296,7 @@ func (checker *OpenStackSecurityGroupChecker) IsFullOpen(sg groups.SecGroup) (bo
 					continue
 				}
 				isFullOpen = true
-				projectName, err := getProjectNameFromID(sg.TenantID, ps)
+				projectName, err := getProjectNameFromID(sg.TenantID, checker.Projects)
 				if err != nil {
 					return isFullOpen, errors.Wrapf(err, "Failed to get project name from id (%s)", sg.TenantID)
 				}
