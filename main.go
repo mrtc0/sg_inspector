@@ -1,6 +1,8 @@
 package main
 
 import (
+	"github.com/pkg/profile"
+	"github.com/sirupsen/logrus"
 	"github.com/takaishi/noguard_sg_checker/check"
 	"github.com/takaishi/noguard_sg_checker/config"
 	"github.com/takaishi/noguard_sg_checker/server"
@@ -11,7 +13,19 @@ import (
 
 var version string
 
+func init() {
+	if os.Getenv("DEBUG") != "" {
+		logrus.SetLevel(logrus.DebugLevel)
+	}
+}
+
 func main() {
+	if os.Getenv("PROFILE") != "" {
+		defer profile.Start(profile.CPUProfile, profile.ProfilePath("."), profile.NoShutdownHook).Stop()
+	}
+
+	log.SetFlags(0)
+
 	app := cli.NewApp()
 	app.Version = config.Version
 	app.Commands = []cli.Command{

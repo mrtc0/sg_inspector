@@ -42,7 +42,7 @@ func Start(c *cli.Context) error {
 
 	server := cron.New()
 	server.AddFunc(checker.Cfg.CheckInterval, func() {
-		err := checker.CheckSecurityGroups()
+		err := checker.Run()
 		if err != nil {
 			log.Printf("[ERROR] %+v\n", err)
 		}

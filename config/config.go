@@ -19,8 +19,10 @@ type Config struct {
 	SlackChannel                  string
 	SlackToken                    string
 	TemporaryAllowdSecurityGroups []string
-	FinishMessage                 string `toml:"finish_message"`
+	PrefixMessage                 string `toml:"prefix_message"`
+	SuffixMessage                 string `toml:"suffix_message"`
 	OpenStack                     OpenStack
+	Policies                      []Policy
 }
 
 type OpenStack struct {
@@ -38,6 +40,13 @@ type Rule struct {
 	TenantID string
 	SG       string
 	Port     []string
+}
+
+type Policy struct {
+	Policy        string `toml:"policy"`
+	Data          string `toml:"data"`
+	PrefixMessage string `toml:"prefix_message"`
+	SuffixMessage string `toml:"suffix_message"`
 }
 
 func includeConfigFile(cfg *Config, include string) error {
