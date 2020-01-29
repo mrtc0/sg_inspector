@@ -30,6 +30,7 @@ type OpenStackSecurityGroupChecker struct {
 	Cert        string
 	Key         string
 	Attachments []slack.Attachment
+	Projects    []projects.Project
 }
 
 func (checker *OpenStackSecurityGroupChecker) CheckSecurityGroups() error {
@@ -47,13 +48,13 @@ func (checker *OpenStackSecurityGroupChecker) CheckSecurityGroups() error {
 		return errors.Wrapf(err, "Failed to authenticate OpenStack API")
 	}
 
-	ps, err := checker.FetchProjects(client, eo)
+	checker.Projects, err = checker.FetchProjects(client, eo)
 	if err != nil {
 		return errors.Wrapf(err, "Failed to fetch projects")
 	}
 
 	for i, rule := range checker.Cfg.Rules {
-		for _, p := range ps {
+		for _, p := range checker.Projects {
 			if rule.Tenant == p.Name {
 				checker.Cfg.Rules[i].TenantID = p.ID
 			}
@@ -65,36 +66,12 @@ func (checker *OpenStackSecurityGroupChecker) CheckSecurityGroups() error {
 		return errors.Wrapf(err, "Failed to security groups")
 	}
 	for _, sg := range securityGroups {
-		for _, rule := range sg.Rules {
-			if rule.RemoteIPPrefix == "0.0.0.0/0" && rule.Protocol == "tcp" && rule.Direction == "ingress" {
-				if !matchAllowdRule(checker.Cfg.Rules, sg, rule) {
-					if contain(checker.Cfg.TemporaryAllowdSecurityGroups, sg.ID) {
-						log.Printf("許可済みのSGなのでSlackに警告メッセージは流さない")
-						continue
-					}
-					existNoguardSG = true
-
-					projectName, err := getProjectNameFromID(sg.TenantID, ps)
-					if err != nil {
-						return errors.Wrapf(err, "Failed to get project name from id (%s)", sg.TenantID)
-					}
-					fmt.Printf("[[rules]]\n")
-					fmt.Printf("tenant = \"%s\"\n", projectName)
-					fmt.Printf("sg = \"%s\"\n", sg.Name)
-
-					fields := []slack.AttachmentField{
-						{Title: "Tenant", Value: projectName},
-						{Title: "ID", Value: sg.ID},
-						{Title: "Name", Value: sg.Name},
-						{Title: "PortRange", Value: fmt.Sprintf("%d-%d", rule.PortRangeMin, rule.PortRangeMax)},
-					}
-					attachment := slack.Attachment{
-						Color:  "#ff6347",
-						Fields: fields,
-					}
-					checker.Attachments = append(checker.Attachments, attachment)
-				}
-			}
+		isFullOpen, err := checker.IsFullOpen(sg)
+		if err != nil {
+			return err
+		}
+		if isFullOpen {
+			existNoguardSG = true
 		}
 
 		var s struct {
@@ -307,4 +284,40 @@ func (checker *OpenStackSecurityGroupChecker) FetchSecurityGroups(client *gopher
 		return true, nil
 	})
 	return sgs, nil
+}
+
+func (checker *OpenStackSecurityGroupChecker) IsFullOpen(sg groups.SecGroup) (bool, error) {
+	isFullOpen := false
+	for _, rule := range sg.Rules {
+		if rule.RemoteIPPrefix == "0.0.0.0/0" && rule.Protocol == "tcp" && rule.Direction == "ingress" {
+			if !matchAllowdRule(checker.Cfg.Rules, sg, rule) {
+				if contain(checker.Cfg.TemporaryAllowdSecurityGroups, sg.ID) {
+					log.Printf("許可済みのSGなのでSlackに警告メッセージは流さない")
+					continue
+				}
+				isFullOpen = true
+				projectName, err := getProjectNameFromID(sg.TenantID, ps)
+				if err != nil {
+					return isFullOpen, errors.Wrapf(err, "Failed to get project name from id (%s)", sg.TenantID)
+				}
+				fmt.Printf("[[rules]]\n")
+				fmt.Printf("tenant = \"%s\"\n", projectName)
+				fmt.Printf("sg = \"%s\"\n", sg.Name)
+
+				fields := []slack.AttachmentField{
+					{Title: "Tenant", Value: projectName},
+					{Title: "ID", Value: sg.ID},
+					{Title: "Name", Value: sg.Name},
+					{Title: "PortRange", Value: fmt.Sprintf("%d-%d", rule.PortRangeMin, rule.PortRangeMax)},
+				}
+				attachment := slack.Attachment{
+					Color:  "#ff6347",
+					Fields: fields,
+				}
+				checker.Attachments = append(checker.Attachments, attachment)
+			}
+		}
+	}
+
+	return isFullOpen, nil
 }
