@@ -14,6 +14,7 @@ import (
 	"github.com/nlopes/slack"
 	"github.com/open-policy-agent/opa/rego"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -78,7 +79,7 @@ func (checker *OpenStackSecurityGroupChecker) Run() (err error) {
 			}
 		}
 
-		return errors.New("Found no guard security group")
+		logrus.Info("Found no guard security group")
 
 	} else {
 		log.Printf("[INFO] 一時的に全解放しているセキュリティグループはありませんでした")
@@ -87,9 +88,16 @@ func (checker *OpenStackSecurityGroupChecker) Run() (err error) {
 	checker.Attachments = []slack.Attachment{}
 
 	for _, policy := range checker.Cfg.Policies {
+		paths := []string{}
+		if policy.Policy != "" {
+			paths = append(paths, policy.Policy)
+		}
+		if policy.Data != "" {
+			paths = append(paths, policy.Data)
+		}
 		r := rego.New(
-			rego.Query("x = data.example.danger[_]"),
-			rego.Load([]string{policy.Policy, policy.Data}, nil),
+			rego.Query("x = data.example.allow"),
+			rego.Load(paths, nil),
 		)
 
 		query, err := r.PrepareForEval(context.Background())
@@ -291,7 +299,8 @@ func (checker *OpenStackSecurityGroupChecker) isFullOpen(sg groups.SecGroup) (bo
 				isFullOpen = true
 				projectName, err := getProjectNameFromID(sg.TenantID, checker.Projects)
 				if err != nil {
-					return isFullOpen, errors.Wrapf(err, "Failed to get project name from id (%s)", sg.TenantID)
+					projectName = sg.TenantID
+					//return isFullOpen, errors.Wrapf(err, "Failed to get project name from id (%s)", sg.TenantID)
 				}
 				fmt.Printf("[[rules]]\n")
 				fmt.Printf("tenant = \"%s\"\n", projectName)
@@ -339,15 +348,11 @@ func (checker *OpenStackSecurityGroupChecker) matchPolicy(query rego.PreparedEva
 	if err != nil {
 		return match, err
 	}
-	if len(rs) > 0 {
+	if len(rs) > 0 && rs[0].Bindings["x"].(bool) {
 		match = true
 		projectName, err := getProjectNameFromID(sg.TenantID, checker.Projects)
 		if err != nil {
-			return match, err
-		}
-		projectName, err = getProjectNameFromID(sg.TenantID, checker.Projects)
-		if err != nil {
-			return match, err
+			err = nil
 		}
 		fmt.Printf("[[rules]]\n")
 		fmt.Printf("tenant = \"%s\"\n", projectName)
