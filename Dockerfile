@@ -7,14 +7,14 @@ ENV GO111MODULE on
 
 RUN mkdir -p /go/{src,bin,pkg}
 
-ADD . /go/src/github.com/takaishi/noguard_sg_checker
-WORKDIR /go/src/github.com/takaishi/noguard_sg_checker
+ADD . /go/src/github.com/takaishi/sg_inspector
+WORKDIR /go/src/github.com/takaishi/sg_inspector
 RUN go get
 RUN go build
 
 FROM alpine:3.8 as app
 RUN apk --no-cache add ca-certificates
 WORKDIR /
-COPY --from=build /go/src/github.com/takaishi/noguard_sg_checker/noguard_sg_checker /noguard_sg_checker
+COPY --from=build /go/src/github.com/takaishi/sg_inspector/sg_inspector /sg_inspector
 
-ENTRYPOINT ["/noguard_sg_checker", "server", "--config", "/config.toml"]
+ENTRYPOINT ["/sg_inspector", "server", "--config", "/config.toml"]

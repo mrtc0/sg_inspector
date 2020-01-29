@@ -4,8 +4,8 @@ import (
 	"github.com/gophercloud/gophercloud"
 	"github.com/nlopes/slack"
 	"github.com/pkg/errors"
-	"github.com/takaishi/noguard_sg_checker/config"
-	"github.com/takaishi/noguard_sg_checker/openstack"
+	"github.com/takaishi/sg_inspector/config"
+	"github.com/takaishi/sg_inspector/openstack"
 	"github.com/urfave/cli"
 )
 

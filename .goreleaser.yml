@@ -10,7 +10,7 @@ builds:
   - env:
       - CGO_ENABLED=0
     ldflags:
-      -X github.com/takaishi/noguard_sg_checker/config.Version={{.Version}}
+      -X github.com/takaishi/sg_inspector/config.Version={{.Version}}
 archive:
   replacements:
     darwin: Darwin
