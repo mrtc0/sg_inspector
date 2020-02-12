@@ -149,7 +149,7 @@ func (checker *OpenStackSecurityGroupChecker) postWarning(attachments []slack.At
 	}
 	err := postMessage(checker.SlackClient, checker.Cfg.SlackChannel, prefix, params)
 	if err != nil {
-		return errors.Wrapf(err, "Failed to post message")
+		return errors.Wrapf(err, "Failed to post prefix message")
 	}
 
 	for _, item := range attachments {
@@ -160,12 +160,12 @@ func (checker *OpenStackSecurityGroupChecker) postWarning(attachments []slack.At
 		}
 		err = postMessage(checker.SlackClient, checker.Cfg.SlackChannel, "", params)
 		if err != nil {
-			return errors.Wrapf(err, "Failed to post message")
+			return errors.Wrapf(err, "Failed to post attachments")
 		}
 	}
 	err = postMessage(checker.SlackClient, checker.Cfg.SlackChannel, suffix, params)
 	if err != nil {
-		return errors.Wrapf(err, "Failed to post message")
+		return errors.Wrapf(err, "Failed to post suffix message")
 	}
 
 	return nil
