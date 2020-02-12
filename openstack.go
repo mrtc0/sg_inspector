@@ -73,7 +73,7 @@ func (checker *OpenStackSecurityGroupChecker) Run() (err error) {
 
 	if existNoguardSG {
 		if !checker.Cfg.DryRun {
-			err := checker.postWarning(checker.Attachments, "", "")
+			err := checker.postWarning(checker.Attachments, checker.Cfg.PrefixMessage, checker.Cfg.SuffixMessage)
 			if err != nil {
 				return errors.Wrapf(err, "Failed to post warning")
 			}
