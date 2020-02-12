@@ -2,6 +2,7 @@ module github.com/takaishi/sg_inspector
 
 require (
 	github.com/BurntSushi/toml v0.3.1
+	github.com/go-playground/validator/v10 v10.2.0
 	github.com/gophercloud/gophercloud v0.7.0
 	github.com/gorilla/websocket v1.4.0 // indirect
 	github.com/nlopes/slack v0.4.0
