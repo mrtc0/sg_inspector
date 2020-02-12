@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/BurntSushi/toml"
+	"github.com/go-playground/validator/v10"
 	"os"
 	"path/filepath"
 )
@@ -11,16 +12,16 @@ var Version string
 type Config struct {
 	DryRun                        bool
 	Rules                         []Rule
-	Username                      string `toml:"username"`
-	IconEmoji                     string `toml:"icon_emoji"`
-	CheckInterval                 string `toml:"check_interval"`
-	ResetInterval                 string `toml:"reset_interval"`
+	Username                      string `toml:"username" validate:"required"`
+	IconEmoji                     string `toml:"icon_emoji" validate:"required"`
+	CheckInterval                 string `toml:"check_interval" validate:"required"`
+	ResetInterval                 string `toml:"reset_interval" validate:"required"`
 	Include                       string
 	SlackChannel                  string
 	SlackToken                    string
 	TemporaryAllowdSecurityGroups []string
-	PrefixMessage                 string `toml:"prefix_message"`
-	SuffixMessage                 string `toml:"suffix_message"`
+	PrefixMessage                 string `toml:"prefix_message" validate:"required"`
+	SuffixMessage                 string `toml:"suffix_message" validate:"required"`
 	OpenStack                     OpenStack
 	Policies                      []Policy
 }
@@ -43,10 +44,10 @@ type Rule struct {
 }
 
 type Policy struct {
-	Policy        string `toml:"policy"`
+	Policy        string `toml:"policy" validate:"required"`
 	Data          string `toml:"data"`
-	PrefixMessage string `toml:"prefix_message"`
-	SuffixMessage string `toml:"suffix_message"`
+	PrefixMessage string `toml:"prefix_message" validate:"required"`
+	SuffixMessage string `toml:"suffix_message" validate:"required"`
 }
 
 func includeConfigFile(cfg *Config, include string) error {
@@ -101,5 +102,9 @@ func ReadConfig(cfgPath string, dryRun bool) (Config, error) {
 	cfg.OpenStack.Cert = os.Getenv("OS_CERT")
 	cfg.OpenStack.Key = os.Getenv("OS_KEY")
 
+	validate := validator.New()
+	if err := validate.Struct(cfg); err != nil {
+		return cfg, err
+	}
 	return cfg, nil
 }
