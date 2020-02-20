@@ -106,6 +106,10 @@ func (checker *OpenStackSecurityGroupChecker) Run() (err error) {
 		}
 		existsSGMatchedPolicy := false
 		for _, sg := range securityGroups {
+			if contain(checker.Cfg.TemporaryAllowdSecurityGroups, sg.ID) {
+				log.Printf("許可済みのSGなのでSlackに警告メッセージは流さない")
+				continue
+			}
 			match, err := checker.matchPolicy(query, sg)
 			if err != nil {
 				return err
