@@ -34,7 +34,7 @@ type OpenStackSecurityGroupChecker struct {
 }
 
 func (checker *OpenStackSecurityGroupChecker) Run() (err error) {
-	log.Printf("%+v\n", checker.Cfg.TemporaryAllowdSecurityGroups)
+	logrus.Info("%+v\n", checker.Cfg.TemporaryAllowdSecurityGroups)
 
 	existNoguardSG := false
 	eo := gophercloud.EndpointOpts{Region: checker.RegionName}
@@ -102,12 +102,12 @@ func (checker *OpenStackSecurityGroupChecker) Run() (err error) {
 
 		query, err := r.PrepareForEval(context.Background())
 		if err != nil {
-			log.Fatal(err)
+			return err
 		}
 		existsSGMatchedPolicy := false
 		for _, sg := range securityGroups {
 			if contain(checker.Cfg.TemporaryAllowdSecurityGroups, sg.ID) {
-				log.Printf("許可済みのSGなのでSlackに警告メッセージは流さない")
+				logrus.Info("許可済みのSGなのでSlackに警告メッセージは流さない")
 				continue
 			}
 			match, err := checker.matchPolicy(query, sg)
@@ -294,7 +294,7 @@ func (checker *OpenStackSecurityGroupChecker) isFullOpen(sg groups.SecGroup) (bo
 		if rule.RemoteIPPrefix == "0.0.0.0/0" && rule.Protocol == "tcp" && rule.Direction == "ingress" {
 			if !matchAllowdRule(checker.Cfg.Rules, sg, rule) {
 				if contain(checker.Cfg.TemporaryAllowdSecurityGroups, sg.ID) {
-					log.Printf("許可済みのSGなのでSlackに警告メッセージは流さない")
+					logrus.Info("許可済みのSGなのでSlackに警告メッセージは流さない")
 					continue
 				}
 				isFullOpen = true
