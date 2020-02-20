@@ -79,10 +79,10 @@ func (checker *OpenStackSecurityGroupChecker) Run() (err error) {
 			}
 		}
 
-		logrus.Info("Found no guard security group")
+		logrus.Info("Found no-guard security group")
 
 	} else {
-		log.Printf("[INFO] 一時的に全解放しているセキュリティグループはありませんでした")
+		logrus.Info("一時的に全解放しているセキュリティグループはありませんでした")
 	}
 
 	checker.Attachments = []slack.Attachment{}
@@ -126,12 +126,9 @@ func (checker *OpenStackSecurityGroupChecker) Run() (err error) {
 					return errors.Wrapf(err, "Failed to post warning")
 				}
 			}
-
-			return errors.New("Found no guard security group")
-
+			logrus.Info("Found no-guard security group")
 		} else {
-			log.Printf("[INFO] 一時的に全解放しているセキュリティグループはありませんでした")
-			return nil
+			logrus.Info("一時的に全解放しているセキュリティグループはありませんでした")
 		}
 	}
 	return nil
