@@ -6,8 +6,8 @@ import (
 	"github.com/nlopes/slack"
 	"github.com/pkg/errors"
 	"github.com/robfig/cron"
+	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
-	"log"
 	"strconv"
 )
 
@@ -42,11 +42,11 @@ func StartServer(c *cli.Context) error {
 	server.AddFunc(checker.Cfg.CheckInterval, func() {
 		err := checker.Run()
 		if err != nil {
-			log.Printf("[ERROR] %+v\n", err)
+			logrus.Error("%+v\n", err)
 		}
 	})
 	server.AddFunc(checker.Cfg.ResetInterval, func() {
-		log.Printf("一時的に許可していたSGをリセットします")
+		logrus.Info("一時的に許可していたSGをリセットします")
 		checker.Cfg.TemporaryAllowdSecurityGroups = []string{}
 	})
 	go server.Run()
@@ -56,19 +56,19 @@ func StartServer(c *cli.Context) error {
 		case msg := <-rtm.IncomingEvents:
 			switch ev := msg.Data.(type) {
 			case *slack.HelloEvent:
-				log.Print("Hello event")
+				logrus.Info("Hello event")
 			case *slack.InvalidAuthEvent:
-				log.Print("Invalid credentials")
+				logrus.Info("Invalid credentials")
 				return errors.New("Invalid credentials")
 			case *slack.ReactionAddedEvent:
 				if ev.Reaction == "white_check_mark" {
-					log.Printf("%v\n", ev)
+					logrus.Info("%v\n", ev)
 					ts, err := strconv.ParseFloat(ev.Item.Timestamp, 64)
 					if err != nil {
 						return err
 					}
-					log.Printf("%f\n", ts)
-					log.Printf("%d\n", int(ts))
+					logrus.Info("%f\n", ts)
+					logrus.Info("%d\n", int(ts))
 					param := slack.HistoryParameters{
 						Latest:    "",
 						Oldest:    fmt.Sprintf("%d", int(ts)),
@@ -84,9 +84,9 @@ func StartServer(c *cli.Context) error {
 						if msg.Timestamp == ev.Item.Timestamp {
 							for _, f := range msg.Attachments[0].Fields {
 								if f.Title == "ID" {
-									log.Printf("%+v\n", f.Value)
+									logrus.Info("%+v\n", f.Value)
 									checker.Cfg.TemporaryAllowdSecurityGroups = append(checker.Cfg.TemporaryAllowdSecurityGroups, f.Value)
-									log.Printf("%+v\n", checker.Cfg.TemporaryAllowdSecurityGroups)
+									logrus.Info("%+v\n", checker.Cfg.TemporaryAllowdSecurityGroups)
 									params := slack.PostMessageParameters{
 										Username:        checker.Cfg.Username,
 										IconEmoji:       checker.Cfg.IconEmoji,

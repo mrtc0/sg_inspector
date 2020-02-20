@@ -4,7 +4,6 @@ import (
 	"github.com/pkg/profile"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
-	"log"
 	"os"
 )
 
@@ -20,8 +19,6 @@ func main() {
 	if os.Getenv("PROFILE") != "" {
 		defer profile.Start(profile.CPUProfile, profile.ProfilePath("."), profile.NoShutdownHook).Stop()
 	}
-
-	log.SetFlags(0)
 
 	app := cli.NewApp()
 	app.Version = Version
@@ -64,14 +61,10 @@ func main() {
 		},
 	}
 
-	app.Before = func(c *cli.Context) error {
-		log.SetFlags(log.Lshortfile | log.Ldate | log.Ltime)
-
-		return nil
-	}
-
 	err := app.Run(os.Args)
 	if err != nil {
-		log.Fatalf("%v", err)
+		logrus.Error("%+v", err)
+		os.Exit(1)
 	}
+	os.Exit(0)
 }
