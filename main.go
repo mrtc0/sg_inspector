@@ -13,6 +13,8 @@ func init() {
 	logrus.SetOutput(os.Stdout)
 	if os.Getenv("DEBUG") != "" {
 		logrus.SetLevel(logrus.DebugLevel)
+	} else {
+		logrus.SetLevel(logrus.InfoLevel)
 	}
 }
 
