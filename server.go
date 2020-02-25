@@ -12,6 +12,7 @@ import (
 )
 
 func StartServer(c *cli.Context) error {
+	logrus.Info("Start Server.")
 	cfg, err := ReadConfig(c.String("config"), c.Bool("dry-run"))
 	if err != nil {
 		return err
