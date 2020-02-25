@@ -10,6 +10,7 @@ import (
 var version string
 
 func init() {
+	logrus.SetOutput(os.Stdout)
 	if os.Getenv("DEBUG") != "" {
 		logrus.SetLevel(logrus.DebugLevel)
 	}
