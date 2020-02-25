@@ -8,8 +8,17 @@ import (
 	"github.com/robfig/cron"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
+	"os"
 	"strconv"
 )
+
+type logProvider struct {
+}
+
+func (l *logProvider) Output(i int, s string) error {
+	logrus.Debug(s)
+	return nil
+}
 
 func StartServer(c *cli.Context) error {
 	logrus.Info("Start Server.")
@@ -19,6 +28,11 @@ func StartServer(c *cli.Context) error {
 	}
 
 	api := slack.New(cfg.SlackToken)
+
+	slack.SetLogger(&logProvider{})
+	if os.Getenv("DEBUG") != "" {
+		api.SetDebug(true)
+	}
 	rtm := api.NewRTM()
 	go rtm.ManageConnection()
 
