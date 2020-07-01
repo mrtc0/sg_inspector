@@ -3,10 +3,10 @@ package main
 import (
 	"fmt"
 	"github.com/gophercloud/gophercloud"
-	"github.com/nlopes/slack"
 	"github.com/pkg/errors"
 	"github.com/robfig/cron"
 	"github.com/sirupsen/logrus"
+	"github.com/slack-go/slack"
 	"github.com/urfave/cli"
 	"os"
 	"strconv"
@@ -29,9 +29,8 @@ func StartServer(c *cli.Context) error {
 
 	api := slack.New(cfg.SlackToken)
 
-	slack.SetLogger(&logProvider{})
 	if os.Getenv("DEBUG") != "" {
-		api.SetDebug(true)
+		slack.OptionDebug(true)(api)
 	}
 	rtm := api.NewRTM()
 	go rtm.ManageConnection()
@@ -107,7 +106,7 @@ func StartServer(c *cli.Context) error {
 										IconEmoji:       checker.Cfg.IconEmoji,
 										ThreadTimestamp: ev.Item.Timestamp,
 									}
-									_, _, err := api.PostMessage(checker.Cfg.SlackChannel, "明日の10時までは許可しますね〜", params)
+									_, _, err := api.PostMessage(checker.Cfg.SlackChannel, slack.MsgOptionText("明日の10時までは許可しますね〜", false), slack.MsgOptionPostMessageParameters(params))
 									if err != nil {
 										return err
 									}

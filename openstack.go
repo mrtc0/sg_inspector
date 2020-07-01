@@ -11,10 +11,10 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/groups"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/rules"
 	"github.com/gophercloud/gophercloud/pagination"
-	"github.com/nlopes/slack"
 	"github.com/open-policy-agent/opa/rego"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	"github.com/slack-go/slack"
 	"io/ioutil"
 	"net/http"
 	"regexp"
@@ -33,7 +33,7 @@ type OpenStackSecurityGroupChecker struct {
 }
 
 func (checker *OpenStackSecurityGroupChecker) Run() (err error) {
-	logrus.Info("%+v\n", checker.Cfg.TemporaryAllowdSecurityGroups)
+	logrus.Infof("%+v\n", checker.Cfg.TemporaryAllowdSecurityGroups)
 
 	existNoguardSG := false
 	eo := gophercloud.EndpointOpts{Region: checker.RegionName}
@@ -147,23 +147,25 @@ func (checker *OpenStackSecurityGroupChecker) postWarning(attachments []slack.At
 		Username:  checker.Cfg.Username,
 		IconEmoji: checker.Cfg.IconEmoji,
 	}
-	err := postMessage(checker.SlackClient, checker.Cfg.SlackChannel, prefix, params)
+	err := postMessage(checker.SlackClient, checker.Cfg.SlackChannel, prefix, nil, params)
 	if err != nil {
 		return errors.Wrapf(err, "Failed to post prefix message")
 	}
 
 	for _, item := range attachments {
 		params := slack.PostMessageParameters{
-			Username:    checker.Cfg.Username,
-			IconEmoji:   checker.Cfg.IconEmoji,
-			Attachments: []slack.Attachment{item},
+			Username:  checker.Cfg.Username,
+			IconEmoji: checker.Cfg.IconEmoji,
 		}
-		err = postMessage(checker.SlackClient, checker.Cfg.SlackChannel, "", params)
+		attachments := []slack.Attachment{
+			item,
+		}
+		err = postMessage(checker.SlackClient, checker.Cfg.SlackChannel, "", attachments, params)
 		if err != nil {
 			return errors.Wrapf(err, "Failed to post attachments")
 		}
 	}
-	err = postMessage(checker.SlackClient, checker.Cfg.SlackChannel, suffix, params)
+	err = postMessage(checker.SlackClient, checker.Cfg.SlackChannel, suffix, nil, params)
 	if err != nil {
 		return errors.Wrapf(err, "Failed to post suffix message")
 	}
@@ -171,8 +173,8 @@ func (checker *OpenStackSecurityGroupChecker) postWarning(attachments []slack.At
 	return nil
 }
 
-func postMessage(api *slack.Client, channel string, text string, params slack.PostMessageParameters) error {
-	_, _, err := api.PostMessage(channel, text, params)
+func postMessage(api *slack.Client, channel string, text string, attachments []slack.Attachment, params slack.PostMessageParameters) error {
+	_, _, err := api.PostMessage(channel, slack.MsgOptionText(text, false), slack.MsgOptionAttachments(attachments...), slack.MsgOptionPostMessageParameters(params))
 	if err != nil {
 		return err
 	}
