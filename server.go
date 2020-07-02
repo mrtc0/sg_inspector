@@ -37,21 +37,19 @@ func StartServer(c *cli.Context) error {
 	rtm := api.NewRTM()
 	go rtm.ManageConnection()
 
-	opts := gophercloud.AuthOptions{
-		IdentityEndpoint: cfg.OpenStack.AuthURL,
-		Username:         cfg.OpenStack.Username,
-		Password:         cfg.OpenStack.Password,
-		DomainName:       "Default",
-		TenantName:       cfg.OpenStack.ProjectName,
-	}
-
 	checker := OpenStackSecurityGroupChecker{
 		Cfg:         cfg,
 		SlackClient: api,
-		AuthOptions: opts,
-		RegionName:  cfg.OpenStack.RegionName,
-		Cert:        cfg.OpenStack.Cert,
-		Key:         cfg.OpenStack.Key,
+		AuthOptions: gophercloud.AuthOptions{
+			IdentityEndpoint: cfg.OpenStack.AuthURL,
+			Username:         cfg.OpenStack.Username,
+			Password:         cfg.OpenStack.Password,
+			DomainName:       "Default",
+			TenantName:       cfg.OpenStack.ProjectName,
+		},
+		RegionName: cfg.OpenStack.RegionName,
+		Cert:       cfg.OpenStack.Cert,
+		Key:        cfg.OpenStack.Key,
 	}
 
 	redisClient := redis.NewClient(
