@@ -33,7 +33,7 @@ type OpenStackSecurityGroupChecker struct {
 }
 
 func (checker *OpenStackSecurityGroupChecker) Run() (err error) {
-	logrus.Infof("%+v\n", checker.Cfg.TemporaryAllowdSecurityGroups)
+	logrus.Infof("Temporary allowed security groups: %+v\n", checker.Cfg.TemporaryAllowdSecurityGroups)
 
 	existNoguardSG := false
 	eo := gophercloud.EndpointOpts{Region: checker.RegionName}
@@ -60,6 +60,8 @@ func (checker *OpenStackSecurityGroupChecker) Run() (err error) {
 		return errors.Wrapf(err, "Failed to security groups")
 	}
 
+	logrus.Info("Start to find security group is allowed to access from any.")
+
 	for _, sg := range securityGroups {
 		isFullOpen, err := checker.isFullOpen(sg)
 		if err != nil {
@@ -78,13 +80,15 @@ func (checker *OpenStackSecurityGroupChecker) Run() (err error) {
 			}
 		}
 
-		logrus.Info("Found no-guard security group")
+		logrus.Info("Security group that allowed to access from any is found.")
 
 	} else {
-		logrus.Info("一時的に全解放しているセキュリティグループはありませんでした")
+		logrus.Info("No security group that allowed to access from any is found.")
 	}
 
 	checker.Attachments = []slack.Attachment{}
+
+	logrus.Info("Start to find security group don't match policy.")
 
 	for _, policy := range checker.Cfg.Policies {
 		paths := []string{}
@@ -125,9 +129,9 @@ func (checker *OpenStackSecurityGroupChecker) Run() (err error) {
 					return errors.Wrapf(err, "Failed to post warning")
 				}
 			}
-			logrus.Info("Found no-guard security group")
+			logrus.Info("Security group that match policy is found.")
 		} else {
-			logrus.Info("一時的に全解放しているセキュリティグループはありませんでした")
+			logrus.Info("No security group that match policy is found.")
 		}
 	}
 	return nil
