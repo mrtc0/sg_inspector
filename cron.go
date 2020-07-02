@@ -23,7 +23,7 @@ func StartCron(c *cli.Context) error {
 	checker := NewOpenStackChecker(cfg, api)
 
 	server := cron.New()
-	logrus.Infof("check intercal: %s", checker.Cfg.CheckInterval)
+	logrus.Infof("check interval: %s", checker.Cfg.CheckInterval)
 	server.AddFunc(checker.Cfg.CheckInterval, func() {
 		err := checker.Run()
 		if err != nil {
