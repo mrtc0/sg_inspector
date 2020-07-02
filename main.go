@@ -66,7 +66,7 @@ func main() {
 
 	err := app.Run(os.Args)
 	if err != nil {
-		logrus.Error("%+v", err)
+		logrus.Errorf("%+v", err)
 		os.Exit(1)
 	}
 	os.Exit(0)

@@ -2,8 +2,8 @@ package main
 
 import (
 	"github.com/gophercloud/gophercloud"
-	"github.com/nlopes/slack"
 	"github.com/pkg/errors"
+	"github.com/slack-go/slack"
 	"github.com/urfave/cli"
 )
 
