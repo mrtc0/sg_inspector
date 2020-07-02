@@ -1,7 +1,9 @@
 package main
 
 import (
+	"context"
 	"fmt"
+	"github.com/go-redis/redis/v8"
 	"github.com/gophercloud/gophercloud"
 	"github.com/pkg/errors"
 	"github.com/robfig/cron"
@@ -52,16 +54,20 @@ func StartServer(c *cli.Context) error {
 		Key:         cfg.OpenStack.Key,
 	}
 
+	redisClient := redis.NewClient(
+		&redis.Options{
+			Addr:     "localhost:6379",
+			Password: "",
+			DB:       0,
+		})
+
 	server := cron.New()
-	server.AddFunc(checker.Cfg.CheckInterval, func() {
-		err := checker.Run()
+	server.AddFunc(checker.Cfg.ResetInterval, func() {
+		logrus.Infof("一時的に許可していたSGをリセットします")
+		_, err := redisClient.Del(context.Background(), REDIS_KEY).Result()
 		if err != nil {
 			logrus.Errorf("%+v\n", err)
 		}
-	})
-	server.AddFunc(checker.Cfg.ResetInterval, func() {
-		logrus.Infof("一時的に許可していたSGをリセットします")
-		checker.Cfg.TemporaryAllowdSecurityGroups = []string{}
 	})
 	go server.Run()
 
@@ -99,8 +105,7 @@ func StartServer(c *cli.Context) error {
 							for _, f := range msg.Attachments[0].Fields {
 								if f.Title == "ID" {
 									logrus.Infof("%+v\n", f.Value)
-									checker.Cfg.TemporaryAllowdSecurityGroups = append(checker.Cfg.TemporaryAllowdSecurityGroups, f.Value)
-									logrus.Infof("%+v\n", checker.Cfg.TemporaryAllowdSecurityGroups)
+									redisClient.LPush(context.Background(), REDIS_KEY, f.Value)
 									params := slack.PostMessageParameters{
 										Username:        checker.Cfg.Username,
 										IconEmoji:       checker.Cfg.IconEmoji,

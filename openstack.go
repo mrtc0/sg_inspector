@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"github.com/go-redis/redis/v8"
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/projects"
@@ -21,6 +22,8 @@ import (
 	"strconv"
 )
 
+const REDIS_KEY = "allowed_sg"
+
 type OpenStackSecurityGroupChecker struct {
 	Cfg         Config
 	SlackClient *slack.Client
@@ -33,7 +36,21 @@ type OpenStackSecurityGroupChecker struct {
 }
 
 func (checker *OpenStackSecurityGroupChecker) Run() (err error) {
-	logrus.Infof("Temporary allowed security groups: %+v\n", checker.Cfg.TemporaryAllowdSecurityGroups)
+	redisClient := redis.NewClient(
+		&redis.Options{
+			Addr:     "localhost:6379",
+			Password: "",
+			DB:       0,
+		})
+	len, err := redisClient.LLen(context.Background(), REDIS_KEY).Result()
+	if err != nil {
+		return err
+	}
+	allowed_sg, err := redisClient.LRange(context.Background(), REDIS_KEY, 0, len).Result()
+	if err != nil {
+		return err
+	}
+	logrus.Infof("Temporary allowed security groups: %+v\n", allowed_sg)
 
 	existNoguardSG := false
 	eo := gophercloud.EndpointOpts{Region: checker.RegionName}
@@ -63,7 +80,7 @@ func (checker *OpenStackSecurityGroupChecker) Run() (err error) {
 	logrus.Info("Start to find security group is allowed to access from any.")
 
 	for _, sg := range securityGroups {
-		isFullOpen, err := checker.isFullOpen(sg)
+		isFullOpen, err := checker.isFullOpen(sg, allowed_sg)
 		if err != nil {
 			return err
 		}
@@ -109,7 +126,7 @@ func (checker *OpenStackSecurityGroupChecker) Run() (err error) {
 		}
 		existsSGMatchedPolicy := false
 		for _, sg := range securityGroups {
-			if contain(checker.Cfg.TemporaryAllowdSecurityGroups, sg.ID) {
+			if contain(allowed_sg, sg.ID) {
 				logrus.Info("許可済みのSGなのでSlackに警告メッセージは流さない")
 				continue
 			}
@@ -293,12 +310,12 @@ func (checker *OpenStackSecurityGroupChecker) fetchSecurityGroups(client *gopher
 	return
 }
 
-func (checker *OpenStackSecurityGroupChecker) isFullOpen(sg groups.SecGroup) (bool, error) {
+func (checker *OpenStackSecurityGroupChecker) isFullOpen(sg groups.SecGroup, allowed_sg []string) (bool, error) {
 	isFullOpen := false
 	for _, rule := range sg.Rules {
 		if rule.RemoteIPPrefix == "0.0.0.0/0" && rule.Protocol == "tcp" && rule.Direction == "ingress" {
 			if !matchAllowdRule(checker.Cfg.Rules, sg, rule) {
-				if contain(checker.Cfg.TemporaryAllowdSecurityGroups, sg.ID) {
+				if contain(allowed_sg, sg.ID) {
 					logrus.Info("許可済みのSGなのでSlackに警告メッセージは流さない")
 					continue
 				}
