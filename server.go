@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"github.com/go-redis/redis/v8"
-	"github.com/gophercloud/gophercloud"
 	"github.com/pkg/errors"
 	"github.com/robfig/cron"
 	"github.com/sirupsen/logrus"
@@ -37,20 +36,7 @@ func StartServer(c *cli.Context) error {
 	rtm := api.NewRTM()
 	go rtm.ManageConnection()
 
-	checker := OpenStackSecurityGroupChecker{
-		Cfg:         cfg,
-		SlackClient: api,
-		AuthOptions: gophercloud.AuthOptions{
-			IdentityEndpoint: cfg.OpenStack.AuthURL,
-			Username:         cfg.OpenStack.Username,
-			Password:         cfg.OpenStack.Password,
-			DomainName:       "Default",
-			TenantName:       cfg.OpenStack.ProjectName,
-		},
-		RegionName: cfg.OpenStack.RegionName,
-		Cert:       cfg.OpenStack.Cert,
-		Key:        cfg.OpenStack.Key,
-	}
+	checker := NewOpenStackChecker(cfg, api)
 
 	redisClient := redis.NewClient(
 		&redis.Options{

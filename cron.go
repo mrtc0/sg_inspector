@@ -1,7 +1,6 @@
 package main
 
 import (
-	"github.com/gophercloud/gophercloud"
 	"github.com/robfig/cron"
 	"github.com/sirupsen/logrus"
 	"github.com/slack-go/slack"
@@ -17,25 +16,11 @@ func StartCron(c *cli.Context) error {
 	}
 
 	api := slack.New(cfg.SlackToken)
-
 	if os.Getenv("DEBUG") != "" {
 		slack.OptionDebug(true)(api)
 	}
 
-	checker := OpenStackSecurityGroupChecker{
-		Cfg:         cfg,
-		SlackClient: api,
-		AuthOptions: gophercloud.AuthOptions{
-			IdentityEndpoint: cfg.OpenStack.AuthURL,
-			Username:         cfg.OpenStack.Username,
-			Password:         cfg.OpenStack.Password,
-			DomainName:       "Default",
-			TenantName:       cfg.OpenStack.ProjectName,
-		},
-		RegionName: cfg.OpenStack.RegionName,
-		Cert:       cfg.OpenStack.Cert,
-		Key:        cfg.OpenStack.Key,
-	}
+	checker := NewOpenStackChecker(cfg, api)
 
 	server := cron.New()
 	logrus.Infof("check intercal: %s", checker.Cfg.CheckInterval)
