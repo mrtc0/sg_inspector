@@ -10,20 +10,19 @@ import (
 var Version string
 
 type Config struct {
-	DryRun                        bool
-	Rules                         []Rule
-	Username                      string `toml:"username" validate:"required"`
-	IconEmoji                     string `toml:"icon_emoji" validate:"required"`
-	CheckInterval                 string `toml:"check_interval" validate:"required"`
-	ResetInterval                 string `toml:"reset_interval" validate:"required"`
-	Include                       string
-	SlackChannel                  string
-	SlackToken                    string
-	TemporaryAllowdSecurityGroups []string
-	PrefixMessage                 string `toml:"prefix_message" validate:"required"`
-	SuffixMessage                 string `toml:"suffix_message" validate:"required"`
-	OpenStack                     OpenStack
-	Policies                      []Policy
+	DryRun        bool
+	Rules         []Rule
+	Username      string `toml:"username" validate:"required"`
+	IconEmoji     string `toml:"icon_emoji" validate:"required"`
+	CheckInterval string `toml:"check_interval" validate:"required"`
+	ResetInterval string `toml:"reset_interval" validate:"required"`
+	Include       string
+	SlackChannel  string
+	SlackToken    string
+	PrefixMessage string `toml:"prefix_message" validate:"required"`
+	SuffixMessage string `toml:"suffix_message" validate:"required"`
+	OpenStack     OpenStack
+	Policies      []Policy
 }
 
 type OpenStack struct {

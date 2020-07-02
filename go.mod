@@ -3,6 +3,7 @@ module github.com/takaishi/sg_inspector
 require (
 	github.com/BurntSushi/toml v0.3.1
 	github.com/go-playground/validator/v10 v10.2.0
+	github.com/go-redis/redis/v8 v8.0.0-beta.5
 	github.com/gophercloud/gophercloud v0.7.0
 	github.com/open-policy-agent/opa v0.16.2
 	github.com/pkg/errors v0.9.1

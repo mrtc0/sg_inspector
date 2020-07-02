@@ -45,6 +45,24 @@ func main() {
 			},
 		},
 		{
+			Name:  "cron",
+			Usage: "",
+			Flags: []cli.Flag{
+				cli.StringFlag{
+					Name:  "config, c",
+					Value: "config.toml",
+				},
+				cli.BoolFlag{
+					Name:   "dry-run",
+					Usage:  "when this is true, does't post message to slack",
+					Hidden: false,
+				},
+			},
+			Action: func(c *cli.Context) error {
+				return StartCron(c)
+			},
+		},
+		{
 			Name:  "check",
 			Usage: "",
 			Flags: []cli.Flag{
