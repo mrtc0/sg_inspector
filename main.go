@@ -41,7 +41,11 @@ func main() {
 				},
 			},
 			Action: func(c *cli.Context) error {
-				return StartServer(c)
+				server, err := NewServer(c.String("config"), c.Bool("dry-run"))
+				if err != nil {
+					return err
+				}
+				return server.Start()
 			},
 		},
 		{
