@@ -139,11 +139,11 @@ func (s *Server) callbackEvent(w http.ResponseWriter, eventsAPIEvent slackevents
 					for _, f := range msg.Attachments[0].Fields {
 						if f.Title == "ID" {
 							logrus.Infof("%+v\n", f.Value)
-							len, err := s.redisClient.LLen(context.Background(), REDIS_KEY).Result()
+							_, err := s.redisClient.RPush(context.Background(), REDIS_KEY, f.Value).Result()
 							if err != nil {
 								return
 							}
-							allowed_sg, err := s.redisClient.LRange(context.Background(), REDIS_KEY, 0, len).Result()
+							allowed_sg, err := s.redisClient.LRange(context.Background(), REDIS_KEY, 0, -1).Result()
 							if err != nil {
 								return
 							}
