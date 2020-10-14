@@ -17,6 +17,7 @@ func NewOpenStackChecker(conf Config, slackClient *slack.Client) *OpenStackSecur
 			TenantName:       conf.OpenStack.ProjectName,
 		},
 		RegionName: conf.OpenStack.RegionName,
+		CACert:     conf.OpenStack.CACert,
 		Cert:       conf.OpenStack.Cert,
 		Key:        conf.OpenStack.Key,
 	}
