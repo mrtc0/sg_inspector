@@ -1,10 +1,11 @@
 package main
 
 import (
-	"github.com/BurntSushi/toml"
-	"github.com/go-playground/validator/v10"
 	"os"
 	"path/filepath"
+
+	"github.com/BurntSushi/toml"
+	"github.com/go-playground/validator/v10"
 )
 
 var Version string
@@ -31,6 +32,7 @@ type OpenStack struct {
 	Password    string
 	RegionName  string
 	ProjectName string
+	CACert      string
 	Cert        string
 	Key         string
 }
@@ -98,6 +100,7 @@ func ReadConfig(cfgPath string, dryRun bool) (Config, error) {
 	cfg.OpenStack.Password = os.Getenv("OS_PASSWORD")
 	cfg.OpenStack.RegionName = os.Getenv("OS_REGION_NAME")
 	cfg.OpenStack.ProjectName = os.Getenv("OS_PROJECT_NAME")
+	cfg.OpenStack.CACert = os.Getenv("OS_CACERT")
 	cfg.OpenStack.Cert = os.Getenv("OS_CERT")
 	cfg.OpenStack.Key = os.Getenv("OS_KEY")
 

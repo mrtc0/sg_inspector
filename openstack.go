@@ -3,8 +3,14 @@ package main
 import (
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"net/http"
+	"regexp"
+	"strconv"
+
 	"github.com/go-redis/redis/v8"
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
@@ -16,10 +22,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/slack-go/slack"
-	"io/ioutil"
-	"net/http"
-	"regexp"
-	"strconv"
 )
 
 const REDIS_KEY = "allowed_sg"
@@ -29,6 +31,7 @@ type OpenStackSecurityGroupChecker struct {
 	SlackClient *slack.Client
 	AuthOptions gophercloud.AuthOptions
 	RegionName  string
+	CACert      string
 	Cert        string
 	Key         string
 	Attachments []slack.Attachment
@@ -54,7 +57,7 @@ func (checker *OpenStackSecurityGroupChecker) Run() (err error) {
 
 	existNoguardSG := false
 	eo := gophercloud.EndpointOpts{Region: checker.RegionName}
-	client, err := checker.authenticate(checker.AuthOptions, checker.Cert, checker.Key)
+	client, err := checker.authenticate(checker.AuthOptions, checker.CACert, checker.Cert, checker.Key)
 	if err != nil {
 		return errors.Wrapf(err, "Failed to authenticate OpenStack API")
 	}
@@ -239,12 +242,25 @@ func contains(slice []string, item string) bool {
 	}
 	return false
 }
-func (checker *OpenStackSecurityGroupChecker) authenticate(opts gophercloud.AuthOptions, osCert string, osKey string) (*gophercloud.ProviderClient, error) {
+func (checker *OpenStackSecurityGroupChecker) authenticate(opts gophercloud.AuthOptions, caCert string, osCert string, osKey string) (*gophercloud.ProviderClient, error) {
 	client, err := openstack.NewClient(opts.IdentityEndpoint)
 	if err != nil {
 		return nil, err
 	}
 	tlsConfig := &tls.Config{}
+
+	if caCert != "" {
+		CA_Pool := x509.NewCertPool()
+
+		severCert, err := ioutil.ReadFile(caCert)
+		if err != nil {
+			return nil, err
+		}
+		CA_Pool.AppendCertsFromPEM(severCert)
+
+		tlsConfig.RootCAs = CA_Pool
+	}
+
 	if osCert != "" && osKey != "" {
 		clientCert, err := ioutil.ReadFile(osCert)
 		if err != nil {
@@ -260,10 +276,10 @@ func (checker *OpenStackSecurityGroupChecker) authenticate(opts gophercloud.Auth
 		}
 		tlsConfig.Certificates = []tls.Certificate{cert}
 		tlsConfig.BuildNameToCertificate()
-		transport := &http.Transport{Proxy: http.ProxyFromEnvironment, TLSClientConfig: tlsConfig}
-
-		client.HTTPClient.Transport = transport
 	}
+	transport := &http.Transport{Proxy: http.ProxyFromEnvironment, TLSClientConfig: tlsConfig}
+
+	client.HTTPClient.Transport = transport
 
 	err = openstack.Authenticate(client, opts)
 	if err != nil {
