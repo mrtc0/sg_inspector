@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"regexp"
 	"strconv"
 
@@ -39,9 +40,14 @@ type OpenStackSecurityGroupChecker struct {
 }
 
 func (checker *OpenStackSecurityGroupChecker) Run() (err error) {
+	redisURL := "localhost:6379"
+
+	if os.Getenv("REDIS_URL") != "" {
+		redisURL = os.Getenv("REDIS_URL")
+	}
 	redisClient := redis.NewClient(
 		&redis.Options{
-			Addr:     "localhost:6379",
+			Addr:     redisURL,
 			Password: "",
 			DB:       0,
 		})
