@@ -11,3 +11,5 @@ test:
 	go test -v $(TEST) -timeout=30s -parallel=4
 	go test -race $(TEST)
 
+run:
+	go run . check --config misc/config.toml --dry-run
