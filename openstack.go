@@ -17,6 +17,7 @@ import (
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/projects"
+	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/layer3/floatingips"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/groups"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/rules"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/ports"
@@ -87,6 +88,11 @@ func (checker *OpenStackSecurityGroupChecker) Run() (err error) {
 		return errors.Wrapf(err, "Failed to fetch ports")
 	}
 
+	fips, err := checker.fetchFloatingIPS(client, eo)
+	if err != nil {
+		return errors.Wrapf(err, "Failed to fetch fips")
+	}
+
 	securityGroups, err := checker.fetchSecurityGroups(client, eo)
 	if err != nil {
 		return errors.Wrapf(err, "Failed to security groups")
@@ -95,7 +101,7 @@ func (checker *OpenStackSecurityGroupChecker) Run() (err error) {
 	logrus.Info("Start to find security group is allowed to access from any.")
 
 	for _, sg := range securityGroups {
-		isFullOpen, err := checker.isFullOpen(sg, ports, allowed_sg)
+		isFullOpen, err := checker.isFullOpen(sg, ports, fips, allowed_sg)
 		if err != nil {
 			return err
 		}
@@ -357,8 +363,61 @@ func (checker *OpenStackSecurityGroupChecker) fetchPorts(client *gophercloud.Pro
 	return
 }
 
-func (checker *OpenStackSecurityGroupChecker) isFullOpen(sg groups.SecGroup, ports []ports.Port, allowed_sg []string) (bool, error) {
+func (checker *OpenStackSecurityGroupChecker) fetchFloatingIPS(client *gophercloud.ProviderClient, eo gophercloud.EndpointOpts) (results []floatingips.FloatingIP, err error) {
+	networkClient, err := openstack.NewNetworkV2(client, eo)
+	if err != nil {
+		return
+	}
+
+	floatingips.List(networkClient, floatingips.ListOpts{}).EachPage(func(page pagination.Page) (bool, error) {
+		floatingIPs, err := floatingips.ExtractFloatingIPs(page)
+		if err != nil {
+			return false, err
+		}
+		for _, fip := range floatingIPs {
+			results = append(results, fip)
+		}
+		return true, nil
+	})
+	return
+}
+
+func (checker *OpenStackSecurityGroupChecker) isFullOpen(sg groups.SecGroup, ports []ports.Port, fips []floatingips.FloatingIP, allowed_sg []string) (bool, error) {
 	isFullOpen := false
+
+	ignorePort := true
+IGNOREPORT:
+	for _, port := range ports {
+		for _, sgid := range port.SecurityGroups {
+			if sgid == sg.ID {
+				// FIPがバインドされているならば通知対象にする
+				for _, fip := range fips {
+					if fip.PortID == port.ID {
+						ignorePort = false
+						break IGNOREPORT
+					}
+				}
+
+				// パブリックIPを持つポートならば通知対象にする
+				for _, ip := range port.FixedIPs {
+					isPrivate, err := isPrivateIP(net.ParseIP(ip.IPAddress))
+					if err != nil {
+						return false, err
+					}
+					if !isPrivate {
+						ignorePort = false
+						break IGNOREPORT
+
+					}
+				}
+			}
+		}
+	}
+
+	if ignorePort {
+		return false, nil
+	}
+
 	for _, rule := range sg.Rules {
 		if rule.RemoteIPPrefix == "0.0.0.0/0" && rule.Protocol == "tcp" && rule.Direction == "ingress" {
 			if !matchAllowdRule(checker.Cfg.Rules, sg, rule) {
@@ -366,27 +425,8 @@ func (checker *OpenStackSecurityGroupChecker) isFullOpen(sg groups.SecGroup, por
 					logrus.Info("許可済みのSGなのでSlackに警告メッセージは流さない")
 					continue
 				}
-			PORT:
-				for _, port := range ports {
-					for _, sgid := range port.SecurityGroups {
-						if sgid == sg.ID {
-							for _, ip := range port.FixedIPs {
-								isPrivate, err := isPrivateIP(net.ParseIP(ip.IPAddress))
-								if err != nil {
-									return false, err
-								}
-								if !isPrivate {
-									isFullOpen = true
-									break PORT
-								}
-							}
-						}
-					}
-				}
 
-				if !isFullOpen {
-					continue
-				}
+				isFullOpen = true
 				projectName, err := getProjectNameFromID(sg.TenantID, checker.Projects)
 				if err != nil {
 					projectName = sg.TenantID
