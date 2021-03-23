@@ -12,11 +12,13 @@ import (
 	"os"
 	"regexp"
 	"strconv"
+	"strings"
 
 	"github.com/go-redis/redis/v8"
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/projects"
+	"github.com/gophercloud/gophercloud/openstack/loadbalancer/v2/loadbalancers"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/layer3/floatingips"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/groups"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/rules"
@@ -98,10 +100,18 @@ func (checker *OpenStackSecurityGroupChecker) Run() (err error) {
 		return errors.Wrapf(err, "Failed to security groups")
 	}
 
+	var loadBalancers []loadbalancers.LoadBalancer
+	if strings.Contains(checker.Cfg.OpenStack.AuthURL, "/mitaka/auth") {
+		loadBalancers, err = checker.fetchLoadbalancers(client, eo)
+		if err != nil {
+			return errors.Wrapf(err, "Failed to loadbarancers")
+		}
+	}
+
 	logrus.Info("Start to find security group is allowed to access from any.")
 
 	for _, sg := range securityGroups {
-		isFullOpen, err := checker.isFullOpen(sg, ports, fips, allowed_sg)
+		isFullOpen, err := checker.isFullOpen(sg, ports, fips, allowed_sg, loadBalancers)
 		if err != nil {
 			return err
 		}
@@ -382,7 +392,42 @@ func (checker *OpenStackSecurityGroupChecker) fetchFloatingIPS(client *gopherclo
 	return
 }
 
-func (checker *OpenStackSecurityGroupChecker) isFullOpen(sg groups.SecGroup, ports []ports.Port, fips []floatingips.FloatingIP, allowed_sg []string) (bool, error) {
+func (checker *OpenStackSecurityGroupChecker) fetchLoadbalancers(client *gophercloud.ProviderClient, eo gophercloud.EndpointOpts) (results []loadbalancers.LoadBalancer, err error) {
+	lbClient, err := openstack.NewLoadBalancerV2(client, eo)
+	if err != nil {
+		return
+	}
+	loadbalancers.List(lbClient, loadbalancers.ListOpts{}).EachPage(func(page pagination.Page) (bool, error) {
+		lbs, err := loadbalancers.ExtractLoadBalancers(page)
+		if err != nil {
+			return false, err
+		}
+
+		for _, lb := range lbs {
+			results = append(results, lb)
+		}
+		return true, nil
+	})
+
+	return
+}
+
+func getLoadBalancerFromID(sgName string, loadBalancers []loadbalancers.LoadBalancer) (*loadbalancers.LoadBalancer, error) {
+	if !strings.HasPrefix(sgName, "lb-") {
+		return nil, errors.Errorf("%s has not prefix lb-", sgName)
+	}
+
+	id := strings.TrimPrefix(sgName, "lb-")
+	for _, lb := range loadBalancers {
+		if lb.ID == id {
+			return &lb, nil
+		}
+	}
+
+	return nil, errors.Errorf("Not found LoadBalancer ID: %s", sgName)
+}
+
+func (checker *OpenStackSecurityGroupChecker) isFullOpen(sg groups.SecGroup, ports []ports.Port, fips []floatingips.FloatingIP, allowed_sg []string, loadBalancers []loadbalancers.LoadBalancer) (bool, error) {
 	isFullOpen := false
 
 	ignorePort := true
@@ -432,6 +477,21 @@ IGNOREPORT:
 					projectName = sg.TenantID
 					//return isFullOpen, errors.Wrapf(err, "Failed to get project name from id (%s)", sg.TenantID)
 				}
+
+				extraFields := []slack.AttachmentField{}
+				if len(loadBalancers) > 0 {
+					lb, err := getLoadBalancerFromID(sg.Name, loadBalancers)
+					if err == nil {
+						lbProjectName, err := getProjectNameFromID(lb.ProjectID, checker.Projects)
+						if err != nil {
+							lbProjectName = lb.ProjectID
+						}
+						lbName := fmt.Sprintf("%s(%s)", lb.Name, lbProjectName)
+						extraFields = append(extraFields, slack.AttachmentField{Title: "LoadBalancer Name", Value: lbName})
+						extraFields = append(extraFields, slack.AttachmentField{Title: "LoadBalancer Description", Value: lb.Description})
+					}
+				}
+
 				fmt.Printf("[[rules]]\n")
 				fmt.Printf("tenant = \"%s\"\n", projectName)
 				fmt.Printf("sg = \"%s\"\n", sg.Name)
@@ -442,6 +502,7 @@ IGNOREPORT:
 					{Title: "Name", Value: sg.Name},
 					{Title: "PortRange", Value: fmt.Sprintf("%d-%d", rule.PortRangeMin, rule.PortRangeMax)},
 				}
+				fields = append(fields, extraFields...)
 				attachment := slack.Attachment{
 					Color:  "#ff6347",
 					Fields: fields,
